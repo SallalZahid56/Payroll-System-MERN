@@ -1,0 +1,45 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const adminController_1 = require("../controllers/adminController");
+const router = express_1.default.Router();
+// Project management routes
+router.get("/users", adminController_1.getUsers);
+router.delete("/users/:id", adminController_1.deleteUser);
+router.post("/users", adminController_1.addUser); // ✅ new route to add user
+router.put("/users/:id", adminController_1.updateUserRole);
+router.post("/add-project", adminController_1.addProject);
+router.post("/add-hourly-project", adminController_1.addHourlyProject);
+router.post("/assign-project", adminController_1.assignProject);
+router.get("/get-users-and-coordinators", adminController_1.getUsersAndCoordinators);
+router.get("/get-profiles-for-form", adminController_1.getProfilesForForm);
+router.get("/get-managers", adminController_1.getManagers);
+router.get("/get-columns", adminController_1.getColumns);
+router.get("/next-project-values", adminController_1.getNextProjectValues);
+router.get("/get-assigned-projects", adminController_1.getAssignedProjects);
+router.get("/get-all-projects", adminController_1.getUnassignedProjects);
+router.get("/get-hourly-assigned-projects", adminController_1.getHourlyAssignedProjects);
+router.get("/get-hourly-unassigned-projects", adminController_1.getHourlyUnassignedProjects);
+router.get("/get-unpriced-unassigned-projects", adminController_1.getUnpricedUnassignedProjects);
+router.put("/update-project/:id", adminController_1.updateProject);
+router.put("/update-hourly-project/:id", adminController_1.updateHourlyProject);
+router.get("/get-project-details/:projectId", adminController_1.getProjectDetails);
+router.put("/update-project-status/:projectId", adminController_1.updateProjectStatus);
+router.post("/write-project-columns/:projectId", adminController_1.writeProjectColumns);
+router.post("/sync-project-data", adminController_1.syncProjectDataController);
+router.get("/get-unpriced-assigned-projects", adminController_1.getUnpricedAssignedProjects);
+router.get("/get-users-profiles", adminController_1.getUsersProfiles);
+router.get("/payroll/all-users", adminController_1.getAllUsersPayroll);
+router.get("/payroll/:username", adminController_1.getUserPayroll);
+router.get("/get-profiles", adminController_1.getProfilesForDropDown);
+router.get("/payroll-profile/:profileName", adminController_1.getProfilePayroll);
+router.get("/payroll-profiles", adminController_1.getAllProfilesPayroll);
+router.get("/payroll-filtered-profiles", adminController_1.getFilteredProfilesPayroll);
+router.get("/payroll-filtered-profiles-nonbwp", adminController_1.getFilteredBWPProfilesPayroll);
+router.get("/companies", adminController_1.getCompanies);
+router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
+router.get("/payroll-infonav-bwp", adminController_1.getInfonavBwpPayroll);
+exports.default = router;
