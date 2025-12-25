@@ -1,0 +1,15 @@
+# Node dependencies
+node_modules/
+
+# Environment variables
+server/.env
+client/.env
+
+# Build outputs
+client/dist
+server/dist
+
+# Ignore sensitive server scripts
+server/migrate.js
+server/fixPasswords.ts
+server/src/seed/seedAdmin.ts
