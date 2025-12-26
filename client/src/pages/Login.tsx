@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import loginSignupImg from "../assets/login-signup.jpg";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../utils/axios";
+import { AxiosError } from "axios";
 
 declare global {
     interface Window {
@@ -38,20 +40,12 @@ export default function Login() {
 
         const handleGoogleLogin = async (response: GoogleResponse) => {
             try {
-                const res = await fetch("http://localhost:5000/api/auth/google-signup", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ token: response.credential }),
+                const res = await api.post("/auth/google-signup", {
+                    token: response.credential,
                 });
 
-                const data = await res.json();
+                const data = res.data;
 
-                if (!res.ok) {
-                    setError(data.error || "Google login failed");
-                    return;
-                }
-
-                // Save token & role
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("role", data.user.role);
 
@@ -62,8 +56,8 @@ export default function Login() {
                     else navigate("/user-dashboard");
                 }, 1000);
             } catch (err) {
-                console.error("Google login error:", err);
-                setError("Network error. Please try again.");
+                const error = err as AxiosError<{ error?: string }>;
+                setError(error.response?.data?.error || "Invalid credentials");
             }
         };
 
@@ -86,7 +80,7 @@ export default function Login() {
         }
     }, [googleClientId, navigate]);
 
-    // ✅ Email + password login
+    // Email + password login
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -94,21 +88,10 @@ export default function Login() {
         setBusy(true);
 
         try {
-            const res = await fetch("http://localhost:5000/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
+            const res = await api.post("/auth/login", { email, password });
 
-            const data = await res.json();
+            const data = res.data;
 
-            if (!res.ok) {
-                setError(data.error || "Invalid credentials");
-                setBusy(false);
-                return;
-            }
-
-            // Save token & role
             localStorage.setItem("token", data.token);
             localStorage.setItem("role", data.user.role);
 
@@ -119,8 +102,8 @@ export default function Login() {
                 else navigate("/user-dashboard");
             }, 1000);
         } catch (err) {
-            console.error(err);
-            setError("Network error");
+            const error = err as AxiosError<{ error?: string }>;
+            setError(error.response?.data?.error || "Invalid credentials");
         } finally {
             setBusy(false);
         }
