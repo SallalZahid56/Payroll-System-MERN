@@ -15,9 +15,22 @@ const managerRoutes_1 = __importDefault(require("./routes/managerRoutes"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
-// ✅ CORS configuration
+const allowedOrigins = [
+    process.env.CLIENT_URL,
+    process.env.CLIENT_URL_PROD,
+];
 app.use((0, cors_1.default)({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+        // Allow Postman / server-to-server requests
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error(`CORS blocked for origin: ${origin}`));
+        }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
