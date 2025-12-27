@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -73,6 +74,7 @@ export default function Sidebar({
             label: "Completed Projects",
             icon: CheckCircle2,
           },
+          { id: "submitted-projects", label: "Submitted Projects", icon: ClipboardCheck },
         ]
           .filter(Boolean)
           .map((item) => {

@@ -1,3 +1,4 @@
+/// <reference path="./types/express.d.ts" />
 import dotenv from "dotenv";  // MUST be first
 dotenv.config();
 
@@ -8,6 +9,7 @@ import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import { startSyncScheduler } from "./utils/syncScheduler"; // We'll create this
 import managerRoutes from "./routes/managerRoutes";
+import profileRoutes from "./routes/profileRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,5 +60,6 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/manager", managerRoutes);
+app.use("/api/profile", profileRoutes);
 
 app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

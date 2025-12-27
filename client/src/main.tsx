@@ -10,6 +10,7 @@ import UserDashboard from "./pages/UserDashboard";
 import PrivateRoute from "./components/PrivateRoute";
 import "./index.css";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import ProfileDashboard from "./pages/ProfileDashboard";
 
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -53,6 +54,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           element={
             <PrivateRoute allowedRoles={["manager"]}>
               <ManagerDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/profile-dashboard"
+          element={
+            <PrivateRoute allowedRoles={["profile"]}>
+              <ProfileDashboard />
             </PrivateRoute>
           }
         />

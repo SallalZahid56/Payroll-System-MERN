@@ -6,13 +6,21 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute = ({ allowedRoles, children }: PrivateRouteProps) => {
-  const role = localStorage.getItem("role"); // get role from localStorage
+  const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
 
-  if (!role || !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />; // redirect if not allowed
+  // 🔒 Not logged in
+  if (!token || !role) {
+    return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>; // render the children (dashboard)
+  // 🔒 Logged in but role not allowed
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  //Authorized
+  return <>{children}</>;
 };
 
 export default PrivateRoute;

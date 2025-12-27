@@ -9,6 +9,7 @@ import UsersSection from "./AdminDashboardSections/UsersSection";
 import UnpricedUnassignedTable from "./AdminDashboardSections/UnpricedUnassignedTable";
 import UnpricedAssignedTable from "./AdminDashboardSections/UnpricedAssignedTable";
 import PayrollDashboard from "./AdminDashboardSections/PayrollDashboard";
+import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -44,6 +45,8 @@ export default function AdminDashboard() {
         return <UsersSection />;
       case "payroll":
         return <PayrollDashboard onCardClick={handlePayrollCardClick} />; // pass collapse handler
+      case "submitted-projects":
+        return <SubmittedProjectsTable />;
       default:
         return <div className="p-4 text-xl">Welcome, Admin!</div>;
     }

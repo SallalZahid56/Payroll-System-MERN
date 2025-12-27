@@ -6,6 +6,7 @@ import ManagerUnassignedProjectsTable from "./AdminDashboardSections/ManagerUnas
 import ManagerHourlyUnassignedProjectsTable from "./AdminDashboardSections/ManagerHourlyUnassignedProjectTable";
 import axios from "../utils/axios"
 import ManagerFormsMenu from "./ManagerFormsMenu";
+import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
 
 interface Project {
   _id: string;
@@ -79,6 +80,8 @@ export default function ManagerDashboard() {
         );
       case "add-project": // now show the forms menu
         return <ManagerFormsMenu />;
+      case "submitted-projects":
+        return <SubmittedProjectsTable />;
       default:
         return <div className="p-4 text-xl">Welcome, Manager!</div>;
     }

@@ -2361,3 +2361,27 @@ export const getInfonavBwpPayroll = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
+
+
+/* ===========================
+   GET SUBMITTED PROJECTS
+=========================== */
+export const getSubmittedProjects = async (req: Request, res: Response) => {
+  try {
+    const projects = await Project.find({ status: "submitted" })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: projects,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching submitted projects:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch submitted projects",
+    });
+  }
+};

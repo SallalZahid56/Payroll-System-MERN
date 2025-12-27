@@ -32,7 +32,8 @@ import {
   getFilteredBWPProfilesPayroll,
   getCompanies,
   getCompanyPayroll,
-  getInfonavBwpPayroll
+  getInfonavBwpPayroll,
+  getSubmittedProjects,
 } from "../controllers/adminController";
 
 const router = express.Router();
@@ -40,7 +41,7 @@ const router = express.Router();
 // Project management routes
 router.get("/users", getUsers);
 router.delete("/users/:id", deleteUser);
-router.post("/users", addUser); // ✅ new route to add user
+router.post("/users", addUser);
 router.put("/users/:id", updateUserRole);
 router.post("/add-project", addProject);
 router.post("/add-hourly-project", addHourlyProject);
@@ -73,6 +74,7 @@ router.get("/payroll-filtered-profiles-nonbwp", getFilteredBWPProfilesPayroll);
 router.get("/companies", getCompanies);
 router.get("/payroll-company/:company", getCompanyPayroll);
 router.get("/payroll-infonav-bwp", getInfonavBwpPayroll);
+router.get("/submitted-projects", getSubmittedProjects);
 
 
 export default router;

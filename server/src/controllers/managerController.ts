@@ -79,8 +79,6 @@ export const addProject = async (req: Request, res: Response) => {
   }
 };
 
-
-
 // To fetch Manager Assigned Projects 
 export const getAssignedProjectsForManager = async (req: Request, res: Response) => {
   try {
@@ -303,5 +301,58 @@ export const addHourlyProject = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Manager add-hourly-project error:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+
+
+
+
+
+/* ============================
+   GET PENDING PROJECTS
+   Assigned to Logged-in User
+============================ */
+export const getPendingAssignedProjects = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    // ✅ Check auth (JWT middleware should already attach user)
+    if (!req.user) {
+      return res.status(401).json({ message: "Not logged in" });
+    }
+
+    const loggedInUserName = req.user.name.trim();
+
+    /**
+     * MongoDB equivalent of:
+     * FIND_IN_SET(user, assigned_to)
+     *
+     * Handles:
+     * - "John"
+     * - "John, Mike"
+     * - "John,Mike"
+     */
+    const projects = await Project.find({
+      assigned_to: { $regex: new RegExp(`(^|,\\s*)${loggedInUserName}(,|$)`, "i") },
+      status: "pending",
+    }).sort({ createdAt: -1 });
+
+    if (!projects || projects.length === 0) {
+      return res.status(404).json({
+        message: "No pending projects assigned to you",
+      });
+    }
+
+    res.json({
+      projects,
+    });
+  } catch (error) {
+    console.error("Error fetching assigned projects:", error);
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 };

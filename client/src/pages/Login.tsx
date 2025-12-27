@@ -32,7 +32,7 @@ export default function Login() {
     const navigate = useNavigate();
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    // ✅ Google login
+    // Google login
     useEffect(() => {
         interface GoogleResponse {
             credential: string;
@@ -53,8 +53,9 @@ export default function Login() {
                 setTimeout(() => {
                     if (data.user.role === "admin") navigate("/admin-dashboard");
                     else if (data.user.role === "manager") navigate("/manager-dashboard");
+                    else if (data.user.role === "profile") navigate("/profile-dashboard");
                     else navigate("/user-dashboard");
-                }, 1000);
+                }, 3000);
             } catch (err) {
                 const error = err as AxiosError<{ error?: string }>;
                 setError(error.response?.data?.error || "Invalid credentials");
@@ -99,8 +100,9 @@ export default function Login() {
             setTimeout(() => {
                 if (data.user.role === "admin") navigate("/admin-dashboard");
                 else if (data.user.role === "manager") navigate("/manager-dashboard");
+                else if (data.user.role === "profile") navigate("/profile-dashboard");
                 else navigate("/user-dashboard");
-            }, 1000);
+            }, 3000);
         } catch (err) {
             const error = err as AxiosError<{ error?: string }>;
             setError(error.response?.data?.error || "Invalid credentials");

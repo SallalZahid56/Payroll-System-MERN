@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
 import PrivateRoute from "./components/PrivateRoute";
+import ProfileDashboard from "./pages/ProfileDashboard";
 
 function App() {
   return (
@@ -24,6 +25,15 @@ function App() {
           element={
             <PrivateRoute allowedRoles={["user"]}>
               <UserDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/profile-dashboard"
+          element={
+            <PrivateRoute allowedRoles={["profile"]}>
+              <ProfileDashboard />
             </PrivateRoute>
           }
         />
