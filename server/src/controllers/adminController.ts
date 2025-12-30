@@ -421,14 +421,12 @@ export const getUnassignedProjects = async (_req: Request, res: Response) => {
 };
 
 
-
-
 /* -------------------- 🔹 Get Users and Coordinators -------------------- */
 export const getUsersAndCoordinators = async (_req: Request, res: Response) => {
   try {
     const users = await User.find({ role: "user" }, "_id name email");
-    const coordinators = await User.find({ role: "coordinator" }, "_id name email");
-    res.json({ success: true, users, coordinators });
+    const managers = await User.find({ role: "manager" }, "_id name email");
+    res.json({ success: true, users, managers });
   } catch (err: any) {
     console.error("❌ Error fetching users/coordinators:", err);
     res.status(500).json({ success: false, message: err.message });

@@ -24,7 +24,7 @@ export default function UserSubmittedProjectsTable() {
     setLoading(true);
     try {
       // API we will connect later
-      const res = await axios.get("/manager/get-pending-projects");
+      const res = await axios.get("/user/get-pending-projects");
       setProjects(res.data.projects || []);
     } catch (err) {
       console.error("Error fetching user projects:", err);
@@ -35,25 +35,29 @@ export default function UserSubmittedProjectsTable() {
   };
 
   const handleGoToProject = (projectId: string) => {
-    const url = `/profile/get-sheet-url/${projectId}`;
+    const url = `/admin/get-sheet-url/${projectId}`;
     window.open(url, "_blank");
   };
 
   const handleSubmitProject = async (projectId: string) => {
-    try {
-      await axios.put(`/user/submit-project/${projectId}`);
-      alert("Project submitted successfully!");
-      fetchProjects();
-    } catch (err) {
-      console.error("Error submitting project:", err);
-      alert("Failed to submit project");
-    }
-  };
+  const confirm = window.confirm("Are you sure you want to submit this project?");
+  if (!confirm) return; // Exit if user cancels
+
+  try {
+    await axios.put(`/user/submit-project/${projectId}`);
+    alert("Project submitted successfully!");
+    fetchProjects();
+  } catch (err) {
+    console.error("Error submitting project:", err);
+    alert("Failed to submit project");
+  }
+};
+
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
       <h2 className="text-2xl font-bold mb-4 text-purple-800">
-        📤 My Assigned Projects
+      Assigned Projects for working and submission
       </h2>
 
       {loading ? (

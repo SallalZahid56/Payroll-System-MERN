@@ -7,9 +7,10 @@ import mongoose from "mongoose";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
-import { startSyncScheduler } from "./utils/syncScheduler"; // We'll create this
+import { startSyncScheduler } from "./utils/syncScheduler";
 import managerRoutes from "./routes/managerRoutes";
 import profileRoutes from "./routes/profileRoutes";
+import userRoutes from "./routes/userRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,5 +62,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/user", userRoutes);
 
 app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

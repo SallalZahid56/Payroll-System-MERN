@@ -31,7 +31,7 @@ export default function FixedAssignedTable() {
   const [editData, setEditData] = useState<Partial<Project>>({});
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedAssignedUser, setSelectedAssignedUser] = useState<string | null>(null);
+  const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]);
 
   useEffect(() => {
     fetchAssignedProjects();
@@ -83,19 +83,19 @@ export default function FixedAssignedTable() {
   const openAssignModal = (project: Project) => {
     setSelectedProjectId(project._id);
 
-    // Use assigned_to_ids to preselect
-    const assignedUserId = project.assigned_to_ids
-      ? project.assigned_to_ids.split(",")[0] // take first assigned user ID
-      : null;
+    // Pass all assigned user IDs
+    const assignedUserIds = project.assigned_to_ids
+      ? project.assigned_to_ids.split(",") // all assigned user IDs
+      : [];
 
-    setSelectedAssignedUser(assignedUserId);
+    setSelectedAssignedUsers(assignedUserIds);
     setShowAssignModal(true);
   };
 
   const closeAssignModal = () => {
     setShowAssignModal(false);
     setSelectedProjectId(null);
-    setSelectedAssignedUser(null);
+    setSelectedAssignedUsers([]);
   };
 
   const renderCell = (project: Project, field: keyof Project) => {
@@ -280,7 +280,7 @@ export default function FixedAssignedTable() {
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={fetchAssignedProjects}
-        currentAssignedUser={selectedAssignedUser} // ✅ preselect user by ID
+        currentAssignedUsers={selectedAssignedUsers} // preselect user by ID
       />
     </div>
   );

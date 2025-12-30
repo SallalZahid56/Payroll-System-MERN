@@ -4,6 +4,7 @@ import axios from "../utils/axios";
 interface User {
   _id: string;
   name: string;
+  role?: "user" | "manager";
 }
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onAssigned: () => void;
-  currentAssignedUser?: string | null;
+  currentAssignedUsers?: string[];
 }
 
 export default function AssignProjectModal({
@@ -19,51 +20,53 @@ export default function AssignProjectModal({
   open,
   onClose,
   onAssigned,
-  currentAssignedUser,
+  currentAssignedUsers,
 }: Props) {
   const [users, setUsers] = useState<User[]>([]);
-  const [coordinators, setCoordinators] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [selectedCoordinators, setSelectedCoordinators] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const fetchUsersAndCoordinators = useCallback(async () => {
+  const filteredUsers: User[] = users.filter((u) =>
+    u.name.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await axios.get("/admin/get-users-and-coordinators");
       if (res.data.success) {
-        setUsers(res.data.users);
-        setCoordinators(res.data.coordinators);
+        const mergedUsers: User[] = [
+          ...res.data.managers.map((m: User) => ({ ...m, role: "manager" })),
+          ...res.data.users.map((u: User) => ({ ...u, role: "user" })),
+        ];
 
-        // ✅ preselect user by ID
-        if (currentAssignedUser) {
-          const exists = res.data.users.find((u: User) => u._id === currentAssignedUser);
-          if (exists) setSelectedUsers([currentAssignedUser]);
+        setUsers(mergedUsers);
+
+        if (currentAssignedUsers && currentAssignedUsers.length > 0) {
+          //  Preselect all previously assigned users
+          const existingIds = mergedUsers
+            .filter(u => currentAssignedUsers.includes(u._id))
+            .map(u => u._id);
+          setSelectedUsers(existingIds);
         }
       }
     } catch (err) {
-      console.error("Error fetching users and coordinators:", err);
+      console.error("Error fetching users:", err);
     }
-  }, [currentAssignedUser]);
+  }, [currentAssignedUsers]);
 
   useEffect(() => {
     if (open) {
-      fetchUsersAndCoordinators();
+      fetchUsers();
     } else {
       setSelectedUsers([]);
-      setSelectedCoordinators([]);
     }
-  }, [open, fetchUsersAndCoordinators]);
+  }, [open, fetchUsers]);
 
-  const toggleSelect = (id: string, isCoordinator: boolean) => {
-    if (isCoordinator) {
-      setSelectedCoordinators((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      );
-    } else {
-      setSelectedUsers((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      );
-    }
+  const toggleSelect = (id: string) => {
+    setSelectedUsers((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleAssign = async (e: React.FormEvent) => {
@@ -73,11 +76,10 @@ export default function AssignProjectModal({
     try {
       setLoading(true);
 
-      // ✅ Send IDs instead of names
+      // Send IDs only
       await axios.post("/admin/assign-project", {
         projectId,
         assignedUsers: selectedUsers,
-        assignedCoordinators: selectedCoordinators,
       });
 
       onAssigned();
@@ -105,35 +107,23 @@ export default function AssignProjectModal({
 
         <form onSubmit={handleAssign} className="space-y-4">
           <div>
-            <h4 className="font-semibold text-gray-800 mb-2">Coordinators</h4>
-            <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
-              {coordinators.map((c) => (
-                <label key={c._id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedCoordinators.includes(c._id)}
-                    onChange={() => toggleSelect(c._id, true)}
-                  />
-                  <span>{c.name}</span>
-                </label>
-              ))}
-              {coordinators.length === 0 && (
-                <p className="text-gray-500 text-sm">No coordinators available</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-2">Users</h4>
-            <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
-              {users.map((u) => (
+            <h4 className="font-semibold text-gray-800 mb-2">Users & Managers</h4>
+            <input
+              type="text"
+              placeholder="Search user..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="w-full mb-2 px-3 py-1 border rounded"
+            />
+            <div className="max-h-60 overflow-y-auto border rounded p-2 space-y-1">
+              {filteredUsers.map((u) => (
                 <label key={u._id} className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     checked={selectedUsers.includes(u._id)}
-                    onChange={() => toggleSelect(u._id, false)}
+                    onChange={() => toggleSelect(u._id)}
                   />
-                  <span>{u.name}</span>
+                  <span>{u.name} {u.role === "manager" && "(Manager)"}</span>
                 </label>
               ))}
               {users.length === 0 && (
