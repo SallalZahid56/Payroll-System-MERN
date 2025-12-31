@@ -125,7 +125,7 @@ export default function ManagerHourlyUnassignedProjectTable() {
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={fetchUnassignedProjects}
-        currentAssignedUser={null} // always unassigned
+        currentAssignedUsers={[]}
       />
     </div>
   );

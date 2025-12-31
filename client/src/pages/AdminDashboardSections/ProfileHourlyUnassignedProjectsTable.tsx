@@ -97,7 +97,7 @@ export default function ProfileHourlyUnassignedProjectsTable({ projects, refresh
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={refresh}
-        currentAssignedUser={null} // always unassigned
+        currentAssignedUsers={[]}
       />
     </div>
   );

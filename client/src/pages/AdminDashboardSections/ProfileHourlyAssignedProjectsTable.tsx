@@ -121,7 +121,7 @@ export default function ProfileHourlyAssignedProjectsTable({ projects, refresh }
                 open={showAssignModal}
                 onClose={closeAssignModal}
                 onAssigned={refresh}
-                currentAssignedUser={selectedAssignedUser}
+                currentAssignedUsers={selectedAssignedUser ? [selectedAssignedUser] : []}
             />
         </div>
     );

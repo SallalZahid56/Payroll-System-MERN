@@ -149,7 +149,7 @@ export default function ManagerHourlyAssignedProjectTable() {
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={fetchHourlyProjects} // refresh after assignment
-        currentAssignedUser={selectedAssignedUser}
+        currentAssignedUsers={selectedAssignedUser ? [selectedAssignedUser] : []}
       />
     </div>
   );

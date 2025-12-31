@@ -280,7 +280,7 @@ export default function FixedAssignedTable() {
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={fetchAssignedProjects}
-        currentAssignedUsers={selectedAssignedUsers} // preselect user by ID
+        currentAssignedUsers={selectedAssignedUsers}
       />
     </div>
   );

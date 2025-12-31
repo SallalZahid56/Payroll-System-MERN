@@ -144,7 +144,7 @@ export default function ManagerAssignedProjectsTable({ projects, refresh }: Prop
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={refresh}
-        currentAssignedUser={selectedAssignedUser} // Preselect user
+        currentAssignedUsers={selectedAssignedUser ? [selectedAssignedUser] : []}
       />
     </div>
   );
