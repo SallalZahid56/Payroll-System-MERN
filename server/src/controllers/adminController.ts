@@ -282,14 +282,17 @@ export const getColumns = async (_req: Request, res: Response) => {
 /* -------------------- 🔹 Get Next Project Values -------------------- */
 export const getNextProjectValues = async (_req: Request, res: Response) => {
   try {
-    const latest = await Project.findOne().sort({ created_at: -1 });
+    // Get the latest project by project_id
+    const latest = await Project.findOne({
+      project_id: { $regex: /^PROJ-\d+$/ }
+    }).sort({ project_id: -1 });
 
     let nextNumber = 1;
 
-    if (latest?.project_name) { // ✅ matches schema
-      const match = latest.project_name.match(/Project-(\d+)/);
+    if (latest?.project_id) {
+      const match = latest.project_id.match(/PROJ-(\d+)/);
       if (match) {
-        nextNumber = parseInt(match[1]) + 1;
+        nextNumber = parseInt(match[1], 10) + 1;
       }
     }
 
@@ -306,8 +309,6 @@ export const getNextProjectValues = async (_req: Request, res: Response) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
 
 
 /* -------------------- 🔹 Add Hourly Project -------------------- */
