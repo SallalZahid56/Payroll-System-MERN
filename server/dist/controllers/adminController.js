@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -370,8 +370,8 @@ exports.getUnassignedProjects = getUnassignedProjects;
 const getUsersAndCoordinators = async (_req, res) => {
     try {
         const users = await user_1.default.find({ role: "user" }, "_id name email");
-        const coordinators = await user_1.default.find({ role: "coordinator" }, "_id name email");
-        res.json({ success: true, users, coordinators });
+        const managers = await user_1.default.find({ role: "manager" }, "_id name email");
+        res.json({ success: true, users, managers });
     }
     catch (err) {
         console.error("❌ Error fetching users/coordinators:", err);
@@ -2073,3 +2073,24 @@ const getInfonavBwpPayroll = async (req, res) => {
     }
 };
 exports.getInfonavBwpPayroll = getInfonavBwpPayroll;
+/* ===========================
+   GET SUBMITTED PROJECTS
+=========================== */
+const getSubmittedProjects = async (req, res) => {
+    try {
+        const projects = await Project_1.default.find({ status: "submitted" })
+            .sort({ createdAt: -1 });
+        res.status(200).json({
+            success: true,
+            data: projects,
+        });
+    }
+    catch (error) {
+        console.error("❌ Error fetching submitted projects:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch submitted projects",
+        });
+    }
+};
+exports.getSubmittedProjects = getSubmittedProjects;

@@ -12,8 +12,6 @@ router.post("/add-project", managerController_1.addProject);
 router.post("/add-hourly-project", authManager_1.authManager, managerController_1.addHourlyProject);
 router.get("/get-assigned-projects", authManager_1.authManager, managerController_1.getAssignedProjectsForManager);
 router.get("/get-unassigned-projects", authManager_1.authManager, managerController_1.getUnassignedProjectsForManager);
-// Hourly assigned projects
 router.get("/get-hourly-assigned-projects", authManager_1.authManager, managerController_1.getHourlyAssignedProjects);
-// Hourly unassigned projects
 router.get("/get-hourly-unassigned-projects", authManager_1.authManager, managerController_1.getHourlyUnassignedProjects);
 exports.default = router;

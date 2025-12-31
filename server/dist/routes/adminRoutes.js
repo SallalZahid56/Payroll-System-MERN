@@ -9,7 +9,7 @@ const router = express_1.default.Router();
 // Project management routes
 router.get("/users", adminController_1.getUsers);
 router.delete("/users/:id", adminController_1.deleteUser);
-router.post("/users", adminController_1.addUser); // ✅ new route to add user
+router.post("/users", adminController_1.addUser);
 router.put("/users/:id", adminController_1.updateUserRole);
 router.post("/add-project", adminController_1.addProject);
 router.post("/add-hourly-project", adminController_1.addHourlyProject);
@@ -42,4 +42,5 @@ router.get("/payroll-filtered-profiles-nonbwp", adminController_1.getFilteredBWP
 router.get("/companies", adminController_1.getCompanies);
 router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
 router.get("/payroll-infonav-bwp", adminController_1.getInfonavBwpPayroll);
+router.get("/submitted-projects", adminController_1.getSubmittedProjects);
 exports.default = router;
