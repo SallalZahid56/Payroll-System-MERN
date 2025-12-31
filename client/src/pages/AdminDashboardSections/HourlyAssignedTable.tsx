@@ -248,7 +248,7 @@ export default function HourlyAssignedTable() {
         open={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onAssigned={fetchProjects}
-        currentAssignedUser={selectedAssignedUser}
+        currentAssignedUsers={selectedAssignedUser ? [selectedAssignedUser] : []}
       />
     </div>
   );
