@@ -15,6 +15,7 @@ const syncScheduler_1 = require("./utils/syncScheduler");
 const managerRoutes_1 = __importDefault(require("./routes/managerRoutes"));
 const profileRoutes_1 = __importDefault(require("./routes/profileRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
+const startInactiveResetScheduler_1 = require("./utils/startInactiveResetScheduler");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
@@ -46,6 +47,7 @@ mongoose_1.default
     console.log("✅ MongoDB connected successfully");
     // Start automatic project data sync scheduler after DB connection
     (0, syncScheduler_1.startSyncScheduler)();
+    (0, startInactiveResetScheduler_1.startInactiveResetScheduler)();
 })
     .catch((err) => console.error("❌ MongoDB connection failed:", err));
 // Default route

@@ -43,4 +43,6 @@ router.get("/companies", adminController_1.getCompanies);
 router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
 router.get("/payroll-infonav-bwp", adminController_1.getInfonavBwpPayroll);
 router.get("/submitted-projects", adminController_1.getSubmittedProjects);
+router.get("/get-completed-projects", adminController_1.getCompletedProjects);
+router.get("/get-completed-project-names", adminController_1.getCompletedProjectNames);
 exports.default = router;

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -2094,3 +2094,38 @@ const getSubmittedProjects = async (req, res) => {
     }
 };
 exports.getSubmittedProjects = getSubmittedProjects;
+// Get completed projects with optional filters
+const getCompletedProjects = async (req, res) => {
+    try {
+        const { start_date, end_date, project_name } = req.query;
+        const filter = { status: "completed" };
+        if (start_date && end_date) {
+            filter.updated_at = {
+                $gte: new Date(start_date),
+                $lte: new Date(end_date),
+            };
+        }
+        if (project_name) {
+            filter.project_name = project_name;
+        }
+        const projects = await Project_1.default.find(filter).lean();
+        res.json(projects);
+    }
+    catch (err) {
+        console.error("Error fetching completed projects:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getCompletedProjects = getCompletedProjects;
+// Get unique completed project names for dropdown
+const getCompletedProjectNames = async (req, res) => {
+    try {
+        const names = await Project_1.default.distinct("project_name", { status: "completed" });
+        res.json(names);
+    }
+    catch (err) {
+        console.error("Error fetching completed project names:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getCompletedProjectNames = getCompletedProjectNames;
