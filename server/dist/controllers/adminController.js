@@ -242,12 +242,15 @@ exports.getColumns = getColumns;
 /* -------------------- 🔹 Get Next Project Values -------------------- */
 const getNextProjectValues = async (_req, res) => {
     try {
-        const latest = await Project_1.default.findOne().sort({ created_at: -1 });
+        // Get the latest project by project_id
+        const latest = await Project_1.default.findOne({
+            project_id: { $regex: /^PROJ-\d+$/ }
+        }).sort({ project_id: -1 });
         let nextNumber = 1;
-        if (latest?.project_name) { // ✅ matches schema
-            const match = latest.project_name.match(/Project-(\d+)/);
+        if (latest?.project_id) {
+            const match = latest.project_id.match(/PROJ-(\d+)/);
             if (match) {
-                nextNumber = parseInt(match[1]) + 1;
+                nextNumber = parseInt(match[1], 10) + 1;
             }
         }
         const nextProjectId = `PROJ-${String(nextNumber).padStart(3, "0")}`;
