@@ -1,7 +1,6 @@
 /// <reference path="./types/express.d.ts" />
 import dotenv from "dotenv";  // MUST be first
 dotenv.config();
-
 import express, { Request, Response } from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -11,6 +10,7 @@ import { startSyncScheduler } from "./utils/syncScheduler";
 import managerRoutes from "./routes/managerRoutes";
 import profileRoutes from "./routes/profileRoutes";
 import userRoutes from "./routes/userRoutes";
+import { startInactiveResetScheduler } from "./utils/startInactiveResetScheduler";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +49,7 @@ mongoose
 
     // Start automatic project data sync scheduler after DB connection
     startSyncScheduler();
+    startInactiveResetScheduler();
   })
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 

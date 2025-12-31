@@ -8,6 +8,7 @@ import axios from "../utils/axios"
 import ManagerFormsMenu from "./ManagerFormsMenu";
 import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
 import UserSubmittedProjectsTable from "./AdminDashboardSections/UserSubmittedProjectsTable";
+import TopBar from "../components/TopBar";
 
 interface Project {
   _id: string;
@@ -96,7 +97,12 @@ export default function ManagerDashboard() {
   return (
     <div className="flex min-h-screen">
       <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} hideUsers hideUnpricedProjects />
-      <div className="flex-1 p-6 bg-gray-50 overflow-x-hidden overflow-y-auto">{renderSection()}</div>
+      <div className="flex-1 flex flex-col bg-gray-50">
+        <TopBar />
+        <div className="flex-1 p-6 overflow-x-hidden overflow-y-auto">
+          {renderSection()}
+        </div>
+      </div>
     </div>
   );
 }

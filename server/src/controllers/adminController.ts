@@ -2383,3 +2383,44 @@ export const getSubmittedProjects = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+
+
+// Get completed projects with optional filters
+export const getCompletedProjects = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date, project_name } = req.query;
+
+    const filter: any = { status: "completed" };
+
+    if (start_date && end_date) {
+      filter.updated_at = {
+        $gte: new Date(start_date as string),
+        $lte: new Date(end_date as string),
+      };
+    }
+
+    if (project_name) {
+      filter.project_name = project_name;
+    }
+
+    const projects = await Project.find(filter).lean();
+
+    res.json(projects);
+  } catch (err) {
+    console.error("Error fetching completed projects:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get unique completed project names for dropdown
+export const getCompletedProjectNames = async (req: Request, res: Response) => {
+  try {
+    const names = await Project.distinct("project_name", { status: "completed" });
+    res.json(names);
+  } catch (err) {
+    console.error("Error fetching completed project names:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

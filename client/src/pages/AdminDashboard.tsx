@@ -10,6 +10,9 @@ import UnpricedUnassignedTable from "./AdminDashboardSections/UnpricedUnassigned
 import UnpricedAssignedTable from "./AdminDashboardSections/UnpricedAssignedTable";
 import PayrollDashboard from "./AdminDashboardSections/PayrollDashboard";
 import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
+import CompletedProjectsTable from "./AdminDashboardSections/CompletedProjects";
+import TopBar from "../components/TopBar";
+
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -45,6 +48,8 @@ export default function AdminDashboard() {
         return <UsersSection />;
       case "payroll":
         return <PayrollDashboard onCardClick={handlePayrollCardClick} />; // pass collapse handler
+      case "completed-projects":
+        return <CompletedProjectsTable />;
       case "submitted-projects":
         return <SubmittedProjectsTable />;
       default:
@@ -60,8 +65,11 @@ export default function AdminDashboard() {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
       />
-      <div className="flex-1 p-6 bg-gray-50 overflow-x-hidden overflow-y-auto">
-        {renderSection()}
+      <div className="flex-1 flex flex-col bg-gray-50 overflow-x-hidden">
+        <TopBar /> {/* LOGOUT BUTTON */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {renderSection()}
+        </div>
       </div>
     </div>
   );

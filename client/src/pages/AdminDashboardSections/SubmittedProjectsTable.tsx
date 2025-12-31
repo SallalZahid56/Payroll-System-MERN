@@ -41,7 +41,37 @@ export default function SubmittedProjectsTable() {
         window.open(url, "_blank");
     };
 
+
+    const handleApprove = async (id: string) => {
+        const confirmed = window.confirm("Are you sure you want to APPROVE this project?");
+        if (!confirmed) return;
+
+        try {
+            await axios.post(`/admin/projects/${id}/approve`);
+            alert("Project approved ✅");
+            fetchSubmittedProjects(); // refresh table
+        } catch (err) {
+            console.error("Error approving project", err);
+            alert("Failed to approve project ❌");
+        }
+    };
+
+    const handleReject = async (id: string) => {
+        const confirmed = window.confirm("Are you sure you want to REJECT this project?");
+        if (!confirmed) return;
+
+        try {
+            await axios.post(`/admin/projects/${id}/reject`);
+            alert("Project rejected ❌");
+            fetchSubmittedProjects(); // refresh table
+        } catch (err) {
+            console.error("Error rejecting project", err);
+            alert("Failed to reject project ❌");
+        }
+    };
+
     return (
+        <div className="overflow-x-auto border rounded-lg">
         <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
             <h2 className="text-2xl font-bold mb-4 text-purple-800">
                 📤 Submitted Projects
@@ -93,9 +123,19 @@ export default function SubmittedProjectsTable() {
                                     </button>
                                 </td>
 
-                                <td className="p-3 text-center">
-                                    <button className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                                        📄 View
+                                <td className="p-3 text-center flex gap-2 justify-center">
+                                    <button
+                                        onClick={() => handleApprove(p._id)}
+                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                    >
+                                        ✅ Approve
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleReject(p._id)}
+                                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                    >
+                                        ❌ Reject
                                     </button>
                                 </td>
                             </tr>
@@ -103,6 +143,7 @@ export default function SubmittedProjectsTable() {
                     </tbody>
                 </table>
             )}
+        </div>
         </div>
     );
 }

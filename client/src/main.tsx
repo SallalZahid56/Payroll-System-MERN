@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -22,7 +21,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/signup" element={<Signup />} />
 
         {/* ====================== */}
-        {/* 🔐 Admin Protected Routes */}
+        {/* Admin Protected Routes */}
         {/* ====================== */}
         <Route
           path="/admin-dashboard/*"
@@ -38,7 +37,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Route>
 
         {/* ====================== */}
-        {/* 👤 User Protected Routes */}
+        {/* User Protected Routes */}
         {/* ====================== */}
         <Route
           path="/user-dashboard"

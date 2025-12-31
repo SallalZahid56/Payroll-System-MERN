@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import UserSubmittedProjectsTable from "./AdminDashboardSections/UserSubmittedProjectsTable";
+import TopBar from "../components/TopBar";
 
 export default function UserDashboard() {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -22,8 +23,11 @@ export default function UserDashboard() {
         hideUsers
         hideUnpricedProjects
       />
-      <div className="flex-1 p-6 bg-gray-50 overflow-x-hidden overflow-y-auto">
-        {renderSection()}
+      <div className="flex-1 flex flex-col bg-gray-50">
+        <TopBar />
+        <div className="flex-1 p-6 overflow-x-hidden overflow-y-auto">
+          {renderSection()}
+        </div>
       </div>
     </div>
   );

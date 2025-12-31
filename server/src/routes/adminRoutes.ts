@@ -34,6 +34,7 @@ import {
   getCompanyPayroll,
   getInfonavBwpPayroll,
   getSubmittedProjects,
+  getCompletedProjects, getCompletedProjectNames
 } from "../controllers/adminController";
 
 const router = express.Router();
@@ -75,6 +76,8 @@ router.get("/companies", getCompanies);
 router.get("/payroll-company/:company", getCompanyPayroll);
 router.get("/payroll-infonav-bwp", getInfonavBwpPayroll);
 router.get("/submitted-projects", getSubmittedProjects);
+router.get("/get-completed-projects", getCompletedProjects);
+router.get("/get-completed-project-names", getCompletedProjectNames);
 
 
 export default router;
