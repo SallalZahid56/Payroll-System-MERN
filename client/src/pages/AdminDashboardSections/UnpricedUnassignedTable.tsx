@@ -172,7 +172,9 @@ export default function UnpricedUnassignedTable() {
                 <td className="p-3 border-r">{renderCell(p, "project_type")}</td>
                 <td className="p-3 border-r">{renderCell(p, "fixed_option")}</td>
                 <td className="p-3 border-r">{renderCell(p, "lumpsum_price")}</td>
-                <td className="p-3 border-r">{renderCell(p, "profile_price_per_entry")}</td>
+                <td className="p-3 border-r min-w-[140px]">
+                  {renderCell(p, "profile_price_per_entry")}
+                </td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_one")}</td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_two")}</td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_three")}</td>

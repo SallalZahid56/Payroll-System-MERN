@@ -1,5 +1,6 @@
 import AssignProjectModal from "../../components/AssignProjectModal";
 import { useState } from "react";
+import axios from "../../utils/axios";
 
 interface Project {
   _id: string;
@@ -32,6 +33,31 @@ export default function ManagerUnassignedProjectsTable({ projects, refresh }: Pr
     setShowAssignModal(false);
     setSelectedProjectId(null);
   };
+
+
+  const handleGoToProject = async (projectId: string) => {
+    try {
+      await axios.put(`/admin/update-project-status/${projectId}`, {
+        status: "In Work",
+      });
+
+      const res = await axios.get(`/admin/get-project-details/${projectId}`);
+      if (!res.data.success || !res.data.googleSheetUrl) {
+        alert("Google Sheet URL not found.");
+        return;
+      }
+
+      await axios.post(`/admin/write-project-columns/${projectId}`);
+
+      window.open(res.data.googleSheetUrl, "_blank");
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert("Could not open the project.");
+    }
+  };
+
+
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
@@ -73,7 +99,10 @@ export default function ManagerUnassignedProjectsTable({ projects, refresh }: Pr
                   </button>
                 </td>
                 <td className="p-3 text-center">
-                  <button onClick={() => alert("Go logic here")} className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                  <button
+                    onClick={() => handleGoToProject(p.project_id)}
+                    className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                  >
                     🚀 Go
                   </button>
                 </td>

@@ -880,9 +880,6 @@ export const writeProjectColumns = async (req: Request, res: Response) => {
 };
 
 
-
-
-
 // server/src/controllers/adminController.ts
 // ----------------- Sync service: syncAllProjects -----------------
 export const syncAllProjects = async (): Promise<{ success: boolean; message: string }> => {
@@ -2361,9 +2358,6 @@ export const getInfonavBwpPayroll = async (req: Request, res: Response) => {
   }
 };
 
-
-
-
 /* ===========================
    GET SUBMITTED PROJECTS
 =========================== */
@@ -2423,5 +2417,288 @@ export const getCompletedProjectNames = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Error fetching completed project names:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// -------------------------
+// Deletable Projects
+// -------------------------
+export const getDeletableProjectNames = async (req: Request, res: Response) => {
+  try {
+    // Return distinct project names ordered by their creation time (oldest first)
+    const docs = await Project.find({}, { project_name: 1, created_at: 1 }).sort({ created_at: 1 }).lean();
+    const names: string[] = [];
+    docs.forEach((d: any) => {
+      if (d.project_name && !names.includes(d.project_name)) names.push(d.project_name);
+    });
+    res.json(names);
+  } catch (err) {
+    console.error("Error fetching deletable project names:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getDeletableProjects = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date, project_id, project_name } = req.query as any;
+    const filter: any = {};
+
+    if (start_date && end_date) {
+      filter.updated_at = { $gte: new Date(start_date), $lte: new Date(end_date) };
+    }
+
+    if (project_id) filter.project_id = String(project_id);
+    if (project_name) filter.project_name = String(project_name);
+
+    const projects = await Project.find(filter).lean();
+    res.json(projects);
+  } catch (err) {
+    console.error("Error fetching deletable projects:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const deleteProject = async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+
+    const dbInstance = mongoose.connection.db;
+    if (!dbInstance) {
+      console.error("MongoDB not connected");
+      return res.status(500).json({ message: "Database not ready" });
+    }
+
+    // Remove related hourly records and worker salaries and project data
+    await dbInstance.collection("hourlyprojectrecords").deleteMany({ project_id: projectId });
+    await dbInstance.collection("workersalaries").deleteMany({ project_id: projectId });
+    await dbInstance.collection("project_data").deleteMany({ project_id: projectId });
+
+    // Remove the main project document
+    const deleted = await Project.findOneAndDelete({ project_id: projectId });
+
+    if (!deleted) return res.status(404).json({ message: "Project not found" });
+
+    res.json({ message: `Project ${projectId} deleted successfully.` });
+  } catch (err) {
+    console.error("Error deleting project:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// Approval Logic for projects
+const normalizeName = (name: string) =>
+  name
+    ?.normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+
+// Single Entry projects approval logic
+export const approveSingleEntryProject = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { projectId } = req.body;
+
+    const project = await Project.findOne({ project_id: projectId });
+    if (!project) return res.status(404).json({ success: false });
+
+    const projectData = (await ProjectData.findOne({
+      project_id: projectId,
+    })) as any;
+    if (!projectData) return res.status(404).json({ success: false });
+
+    const users = await User.find({}, { name: 1 });
+    const userMap: Record<string, string> = {};
+    users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
+
+    const salaries: Record<string, number> = {};
+    const entryCounts: Record<string, number> = {};
+
+    projectData.row_data.forEach((row: any[]) => {
+      const raw = row[row.length - 1] as string | undefined;
+      if (!raw) return;
+
+      raw.split(",").forEach((name: string) => {
+        const real = userMap[normalizeName(name)];
+        if (!real) return;
+
+        salaries[real] = (salaries[real] || 0) + project.price_worker_one!;
+        entryCounts[real] = (entryCounts[real] || 0) + 1;
+      });
+    });
+
+    const totalEntries = Object.values(entryCounts).reduce<number>(
+      (a, b) => a + b,
+      0
+    );
+    const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+
+    const WorkerSalaryCollection = db.collection("workersalaries");
+    const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+
+    for (const worker of Object.keys(salaries)) {
+      const salary = salaries[worker];
+      const entries = entryCounts[worker];
+
+      if (!project.is_revised) {
+        await WorkerSalaryCollection.updateOne(
+          { worker_name: worker, project_id: projectId },
+          { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } },
+          { upsert: true }
+        );
+      } else {
+        const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+        const diffSalary = salary - (old?.salary || 0);
+        const diffEntries = entries - (old?.no_of_entries || 0);
+
+        if (diffSalary !== 0 || diffEntries !== 0) {
+          await RevisedWorkerSalaryCollection.updateOne(
+            { worker_name: worker, project_id: projectId },
+            { $inc: { revised_salary: diffSalary, revised_profile_debit: profileDebit, no_of_entries: diffEntries } },
+            { upsert: true }
+          );
+        }
+      }
+    }
+
+    await Project.updateOne({ project_id: projectId }, { status: "completed" });
+    res.json({ success: true, message: "Single entry project approved" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+};
+
+// Approve MultiEntry Projects Logic
+export const approveMultiEntryProject = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { projectId } = req.body;
+
+    const project = await Project.findOne({ project_id: projectId });
+    const projectData = (await ProjectData.findOne({
+      project_id: projectId,
+    })) as any;
+
+    if (!project || !projectData) return res.status(404).json({ success: false });
+
+    const entryCountMap: Record<string, number> = {
+      "Double Entry": 2,
+      "Triple Entry": 3,
+      "Four Entry": 4,
+      "Fifth Entry": 5,
+    };
+
+    // Fix TypeScript error by guarding undefined
+    const numEntries = entryCountMap[project.fixed_option ?? ""] || 1;
+
+    const priceMap = [
+      project.price_worker_one,
+      project.price_worker_two,
+      project.price_worker_three,
+      project.price_worker_four,
+      project.price_worker_five,
+    ];
+
+    const users = await User.find({}, { name: 1 });
+    const userMap: Record<string, string> = {};
+    users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
+
+    const salaries: Record<string, number> = {};
+    const entryCounts: Record<string, number> = {};
+
+    projectData.row_data.forEach((row: any[]) => {
+      for (let i = 0; i < numEntries; i++) {
+        const raw = row[row.length - numEntries + i] as string | undefined;
+        if (!raw) continue;
+
+        const real = userMap[normalizeName(raw)];
+        if (!real) continue;
+
+        salaries[real] = (salaries[real] || 0) + priceMap[i]!;
+        entryCounts[real] = (entryCounts[real] || 0) + 1;
+      }
+    });
+
+    const totalEntries = Object.values(entryCounts).reduce<number>(
+      (a, b) => a + b,
+      0
+    );
+    const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+
+    const WorkerSalaryCollection = db.collection("workersalaries");
+    const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+
+    for (const worker of Object.keys(salaries)) {
+      const salary = salaries[worker];
+      const entries = entryCounts[worker];
+
+      if (!project.is_revised) {
+        await WorkerSalaryCollection.updateOne(
+          { worker_name: worker, project_id: projectId },
+          { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } },
+          { upsert: true }
+        );
+      } else {
+        const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+        const diffSalary = salary - (old?.salary || 0);
+        const diffEntries = entries - (old?.no_of_entries || 0);
+
+        if (diffSalary !== 0 || diffEntries !== 0) {
+          await RevisedWorkerSalaryCollection.updateOne(
+            { worker_name: worker, project_id: projectId },
+            { $inc: { revised_salary: diffSalary, revised_profile_debit: profileDebit, no_of_entries: diffEntries } },
+            { upsert: true }
+          );
+        }
+      }
+    }
+
+    await Project.updateOne({ project_id: projectId }, { status: "completed" });
+    res.json({ success: true, message: "Multi-entry project approved" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+};
+
+// Lumpsum Project Approval Logic
+export const approveLumpsumProject = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { projectId, salaries, lumpsumPrice }: {
+      projectId: string;
+      salaries: { worker: string; salary: number }[];
+      lumpsumPrice: number;
+    } = req.body;
+
+    const total = salaries.reduce<number>((s, x) => s + x.salary, 0);
+    if (total !== lumpsumPrice)
+      return res.status(400).json({ success: false });
+
+    const WorkerSalaryCollection = db.collection("workersalaries");
+
+    for (const { worker, salary } of salaries) {
+      await WorkerSalaryCollection.updateOne(
+        { worker_name: worker, project_id: projectId },
+        { $inc: { salary, profile_debit: lumpsumPrice } },
+        { upsert: true }
+      );
+    }
+
+    await Project.updateOne({ project_id: projectId }, { status: "completed" });
+
+    res.json({ success: true, message: "Lumpsum project approved" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 };

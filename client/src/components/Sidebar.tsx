@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Trash,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -17,6 +18,7 @@ interface SidebarProps {
   hideUnpricedProjects?: boolean;
   collapsed?: boolean;
   setCollapsed?: (value: boolean) => void; // Add this to control from parent
+  showDeleteProject?: boolean; // whether to show the 'Delete a Project' item
 }
 
 interface MenuButtonItem {
@@ -32,6 +34,7 @@ export default function Sidebar({
   hideUnpricedProjects,
   collapsed = false,
   setCollapsed,
+  showDeleteProject = false,
 }: SidebarProps) {
   return (
     <aside
@@ -75,6 +78,8 @@ export default function Sidebar({
             icon: CheckCircle2,
           },
           { id: "submitted-projects", label: "Submitted Projects", icon: ClipboardCheck },
+          // Only show Delete a Project for dashboards that opt-in
+          showDeleteProject && { id: "delete-projects", label: "Delete a Project", icon: Trash },
         ]
           .filter(Boolean)
           .map((item) => {

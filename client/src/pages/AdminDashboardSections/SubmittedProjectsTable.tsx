@@ -13,6 +13,13 @@ interface Project {
     google_sheet_url?: string;
 }
 
+interface ApproveRequestBody {
+    projectId: string;
+    salaries?: { worker: string; salary: number }[];
+    lumpsumPrice?: number;
+}
+
+
 export default function SubmittedProjectsTable() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -42,12 +49,30 @@ export default function SubmittedProjectsTable() {
     };
 
 
-    const handleApprove = async (id: string) => {
+    const handleApprove = async (project: Project) => {
         const confirmed = window.confirm("Are you sure you want to APPROVE this project?");
         if (!confirmed) return;
 
         try {
-            await axios.post(`/admin/projects/${id}/approve`);
+            let url = "";
+            const body: ApproveRequestBody = { projectId: project.project_id };
+
+            // Decide which route to call
+            if (project.fixed_option) {
+                // Multi-entry project
+                url = "/admin/approve-multi-entry";
+            } else if (project.sheet_name && !project.fixed_option) {
+                // Single-entry project
+                url = "/admin/approve-single-entry";
+            } else {
+                // Lumpsum project example: you may need extra info
+                url = "/admin/approve-lumpsum";
+                body.salaries = []; // fill in salaries if needed
+                body.lumpsumPrice = 0; // fill in lumpsum price if needed
+            }
+
+            await axios.post(url, body);
+
             alert("Project approved ✅");
             fetchSubmittedProjects(); // refresh table
         } catch (err) {
@@ -72,78 +97,78 @@ export default function SubmittedProjectsTable() {
 
     return (
         <div className="overflow-x-auto border rounded-lg">
-        <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-4 text-purple-800">
-                📤 Submitted Projects
-            </h2>
+            <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
+                <h2 className="text-2xl font-bold mb-4 text-purple-800">
+                    📤 Submitted Projects
+                </h2>
 
-            {loading ? (
-                <div className="text-center text-gray-500">Loading projects...</div>
-            ) : projects.length === 0 ? (
-                <div className="text-center text-gray-500">No submitted projects found.</div>
-            ) : (
-                <table className="min-w-full text-sm text-left border-collapse">
-                    <thead className="bg-purple-100 text-gray-800">
-                        <tr>
-                            {[
-                                "Project ID",
-                                "Project Name",
-                                "Profile Name",
-                                "Sheet Name",
-                                "Fixed Option",
-                                "Shift",
-                                "Assigned To",
-                                "Go to Project",
-                                "Actions",
-                            ].map((h) => (
-                                <th key={h} className="p-3 border-r font-semibold whitespace-nowrap">
-                                    {h}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {projects.map((p) => (
-                            <tr key={p._id} className="hover:bg-purple-50 border-b">
-                                <td className="p-3 border-r">{p.project_id}</td>
-                                <td className="p-3 border-r">{p.project_name}</td>
-                                <td className="p-3 border-r">{p.profile_name}</td>
-                                <td className="p-3 border-r">{p.sheet_name}</td>
-                                <td className="p-3 border-r">{p.fixed_option ?? "—"}</td>
-                                <td className="p-3 border-r">{p.shift ?? "—"}</td>
-                                <td className="p-3 border-r">{p.assigned_to ?? "—"}</td>
-
-                                <td className="p-3 text-center border-r">
-                                    <button
-                                        onClick={() => handleGoToProject(p.google_sheet_url)}
-                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                                    >
-                                        🚀 Go to Project
-                                    </button>
-                                </td>
-
-                                <td className="p-3 text-center flex gap-2 justify-center">
-                                    <button
-                                        onClick={() => handleApprove(p._id)}
-                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                                    >
-                                        ✅ Approve
-                                    </button>
-
-                                    <button
-                                        onClick={() => handleReject(p._id)}
-                                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                                    >
-                                        ❌ Reject
-                                    </button>
-                                </td>
+                {loading ? (
+                    <div className="text-center text-gray-500">Loading projects...</div>
+                ) : projects.length === 0 ? (
+                    <div className="text-center text-gray-500">No submitted projects found.</div>
+                ) : (
+                    <table className="min-w-full text-sm text-left border-collapse">
+                        <thead className="bg-purple-100 text-gray-800">
+                            <tr>
+                                {[
+                                    "Project ID",
+                                    "Project Name",
+                                    "Profile Name",
+                                    "Sheet Name",
+                                    "Fixed Option",
+                                    "Shift",
+                                    "Assigned To",
+                                    "Go to Project",
+                                    "Actions",
+                                ].map((h) => (
+                                    <th key={h} className="p-3 border-r font-semibold whitespace-nowrap">
+                                        {h}
+                                    </th>
+                                ))}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </div>
+                        </thead>
+
+                        <tbody>
+                            {projects.map((p) => (
+                                <tr key={p._id} className="hover:bg-purple-50 border-b">
+                                    <td className="p-3 border-r">{p.project_id}</td>
+                                    <td className="p-3 border-r">{p.project_name}</td>
+                                    <td className="p-3 border-r">{p.profile_name}</td>
+                                    <td className="p-3 border-r">{p.sheet_name}</td>
+                                    <td className="p-3 border-r">{p.fixed_option ?? "—"}</td>
+                                    <td className="p-3 border-r">{p.shift ?? "—"}</td>
+                                    <td className="p-3 border-r">{p.assigned_to ?? "—"}</td>
+
+                                    <td className="p-3 text-center border-r">
+                                        <button
+                                            onClick={() => handleGoToProject(p.google_sheet_url)}
+                                            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                        >
+                                            🚀 Go to Project
+                                        </button>
+                                    </td>
+
+                                    <td className="p-3 text-center flex gap-2 justify-center">
+                                        <button
+                                            onClick={() => handleApprove(p)}
+                                            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                        >
+                                            ✅ Approve
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleReject(p._id)}
+                                            className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                        >
+                                            ❌ Reject
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     );
 }

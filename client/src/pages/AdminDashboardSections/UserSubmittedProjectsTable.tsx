@@ -34,30 +34,47 @@ export default function UserSubmittedProjectsTable() {
     }
   };
 
-  const handleGoToProject = (projectId: string) => {
-    const url = `/admin/get-sheet-url/${projectId}`;
-    window.open(url, "_blank");
+  const handleGoToProject = async (projectId: string) => {
+    try {
+      await axios.put(`/admin/update-project-status/${projectId}`, {
+        status: "In Work",
+      });
+
+      const res = await axios.get(`/admin/get-project-details/${projectId}`);
+      if (!res.data.success || !res.data.googleSheetUrl) {
+        alert("Google Sheet URL not found.");
+        return;
+      }
+
+      await axios.post(`/admin/write-project-columns/${projectId}`);
+
+      window.open(res.data.googleSheetUrl, "_blank");
+    } catch (err) {
+      console.error("Error opening project:", err);
+      alert("Failed to open the project.");
+    }
   };
 
-  const handleSubmitProject = async (projectId: string) => {
-  const confirm = window.confirm("Are you sure you want to submit this project?");
-  if (!confirm) return; // Exit if user cancels
 
-  try {
-    await axios.put(`/user/submit-project/${projectId}`);
-    alert("Project submitted successfully!");
-    fetchProjects();
-  } catch (err) {
-    console.error("Error submitting project:", err);
-    alert("Failed to submit project");
-  }
-};
+  const handleSubmitProject = async (projectId: string) => {
+    const confirm = window.confirm("Are you sure you want to submit this project?");
+    if (!confirm) return; // Exit if user cancels
+
+    try {
+      await axios.put(`/user/submit-project/${projectId}`);
+      alert("Project submitted successfully!");
+      fetchProjects();
+    } catch (err) {
+      console.error("Error submitting project:", err);
+      alert("Failed to submit project");
+    }
+  };
 
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
       <h2 className="text-2xl font-bold mb-4 text-purple-800">
-      Assigned Projects for working and submission
+        Assigned Projects for working and submission
       </h2>
 
       {loading ? (

@@ -51,25 +51,40 @@ export default function ManagerAssignedProjectsTable({ projects, refresh }: Prop
     setSelectedAssignedUser(null);
   };
 
-  // ⭐ Go To Project Logic
   const handleGoToProject = async (projectId: string) => {
     try {
-      await axios.put(`/admin/update-project-status/${projectId}`, { status: "In Work" });
+      // 1️⃣ Update project status
+      await axios.put(`/admin/update-project-status/${projectId}`, {
+        status: "In Work",
+      });
 
+      // 2️⃣ Fetch project details
       const res = await axios.get(`/admin/get-project-details/${projectId}`);
       if (!res.data.success || !res.data.googleSheetUrl) {
-        return alert("Google Sheet URL not found.");
+        alert("Google Sheet URL not found.");
+        return;
       }
 
-      await axios.post(`/admin/write-project-columns/${projectId}`);
+      // 3️⃣ Ensure worker columns exist
+      const writeRes = await axios.post(
+        `/admin/write-project-columns/${projectId}`
+      );
+      if (!writeRes.data.success) {
+        alert(writeRes.data.message || "Failed to process project columns.");
+        return;
+      }
 
+      // 4️⃣ Open Google Sheet
       window.open(res.data.googleSheetUrl, "_blank");
-      refresh();
+
+      // 5️⃣ Refresh table (passed from props or local fetch)
+      refresh?.();
     } catch (err) {
-      console.error(err);
-      alert("Could not open the project.");
+      console.error("Error opening project:", err);
+      alert("Failed to open the project.");
     }
   };
+
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">

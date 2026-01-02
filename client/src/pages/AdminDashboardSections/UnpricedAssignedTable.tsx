@@ -111,7 +111,7 @@ export default function UnpricedAssignedTable() {
         <table className="min-w-full text-sm border-collapse">
           <thead className="bg-purple-100 text-gray-800">
             <tr>
-              {["Project ID","Project Name","Profile Name","Sheet Name","Created","Deadline","Type","Fixed Option","Lumpsum","Profile Price","Worker 1","Worker 2","Worker 3","Worker 4","Worker 5","Shift","Status","Profile Type","Edit"].map(h => (
+              {["Project ID", "Project Name", "Profile Name", "Sheet Name", "Created", "Deadline", "Type", "Fixed Option", "Lumpsum", "Profile Price", "Worker 1", "Worker 2", "Worker 3", "Worker 4", "Worker 5", "Shift", "Status", "Profile Type", "Edit"].map(h => (
                 <th key={h} className="p-3 border-r font-semibold whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -129,7 +129,7 @@ export default function UnpricedAssignedTable() {
                 <td className="p-3 border-r">{renderCell(p, "project_type")}</td>
                 <td className="p-3 border-r">{renderCell(p, "fixed_option")}</td>
                 <td className="p-3 border-r">{renderCell(p, "lumpsum_price")}</td>
-                <td className="p-3 border-r">{renderCell(p, "profile_price_per_entry")}</td>
+                <td className="p-3 border-r min-w-[140px]">{renderCell(p, "profile_price_per_entry")}</td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_one")}</td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_two")}</td>
                 <td className="p-3 border-r">{renderCell(p, "price_worker_three")}</td>
