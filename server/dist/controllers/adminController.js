@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -2196,6 +2196,71 @@ const deleteProject = async (req, res) => {
     }
 };
 exports.deleteProject = deleteProject;
+// -------------------------
+// Project Expense
+// -------------------------
+const getProjectsList = async (req, res) => {
+    try {
+        const projects = await Project_1.default.find({ status: "completed" })
+            .select("project_id project_name")
+            .sort({ created_at: 1 })
+            .lean();
+        res.json(projects);
+    }
+    catch (err) {
+        console.error("Error fetching project list:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getProjectsList = getProjectsList;
+const getProjectPayroll = async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        if (!projectId)
+            return res.status(400).json({ success: false, message: "Project ID missing." });
+        const project = await Project_1.default.findOne({ project_id: projectId }).lean();
+        if (!project)
+            return res.status(404).json({ success: false, message: "Project not found." });
+        const dbInst = mongoose_1.default.connection.db;
+        if (!dbInst) {
+            console.error("MongoDB not connected");
+            return res.status(500).json({ success: false, message: "Database not ready" });
+        }
+        // Fixed salaries (workersalaries)
+        const fixed = await dbInst.collection("workersalaries").find({ project_id: projectId }).toArray();
+        // Hourly records
+        const hourly = await dbInst.collection("hourlyprojectrecords").find({ project_id: projectId }).toArray();
+        const fixedMapped = fixed.map((ws) => ({
+            project_id: project.project_id,
+            project_name: project.project_name,
+            sheet_name: ws.sheet_name ?? project.sheet_name ?? "",
+            profile_name: project.profile_name,
+            worker_name: ws.worker_name,
+            salary: ws.salary,
+            entries: ws.no_of_entries ?? ws.entries ?? null,
+            profile_debit: ws.profile_debit ?? null,
+            company: project.company ?? "",
+        }));
+        const hourlyMapped = hourly.map((h) => ({
+            project_id: project.project_id,
+            project_name: project.project_name,
+            sheet_name: "Hourly Project",
+            profile_name: project.profile_name,
+            worker_name: h.worker_name,
+            salary: h.salary,
+            entries: h.no_of_entries ?? null,
+            profile_debit: null,
+            company: project.company ?? "",
+        }));
+        const combined = [...fixedMapped, ...hourlyMapped];
+        res.json({ success: true, data: combined });
+    }
+    catch (err) {
+        console.error("Error fetching project payroll:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+exports.getProjectPayroll = getProjectPayroll;
 // Approval Logic for projects
 const normalizeName = (name) => name
     ?.normalize("NFKD")

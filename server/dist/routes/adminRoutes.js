@@ -49,6 +49,9 @@ router.get("/get-completed-project-names", adminController_1.getCompletedProject
 router.get("/get-deletable-project-names", adminController_1.getDeletableProjectNames);
 router.get("/get-deletable-projects", adminController_1.getDeletableProjects);
 router.delete("/delete-project/:projectId", adminController_1.deleteProject);
+// Project Expense routes
+router.get("/projects/list", adminController_1.getProjectsList);
+router.get("/payroll/project/:projectId", adminController_1.getProjectPayroll);
 router.post("/approve-single-entry", adminController_1.approveSingleEntryProject);
 router.post("/approve-multi-entry", adminController_1.approveMultiEntryProject);
 router.post("/approve-lumpsum", adminController_1.approveLumpsumProject);
