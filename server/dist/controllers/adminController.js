@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getInfonavBwpPayroll = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -2132,3 +2132,221 @@ const getCompletedProjectNames = async (req, res) => {
     }
 };
 exports.getCompletedProjectNames = getCompletedProjectNames;
+// -------------------------
+// Deletable Projects
+// -------------------------
+const getDeletableProjectNames = async (req, res) => {
+    try {
+        // Return distinct project names ordered by their creation time (oldest first)
+        const docs = await Project_1.default.find({}, { project_name: 1, created_at: 1 }).sort({ created_at: 1 }).lean();
+        const names = [];
+        docs.forEach((d) => {
+            if (d.project_name && !names.includes(d.project_name))
+                names.push(d.project_name);
+        });
+        res.json(names);
+    }
+    catch (err) {
+        console.error("Error fetching deletable project names:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getDeletableProjectNames = getDeletableProjectNames;
+const getDeletableProjects = async (req, res) => {
+    try {
+        const { start_date, end_date, project_id, project_name } = req.query;
+        const filter = {};
+        if (start_date && end_date) {
+            filter.updated_at = { $gte: new Date(start_date), $lte: new Date(end_date) };
+        }
+        if (project_id)
+            filter.project_id = String(project_id);
+        if (project_name)
+            filter.project_name = String(project_name);
+        const projects = await Project_1.default.find(filter).lean();
+        res.json(projects);
+    }
+    catch (err) {
+        console.error("Error fetching deletable projects:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getDeletableProjects = getDeletableProjects;
+const deleteProject = async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const dbInstance = mongoose_1.default.connection.db;
+        if (!dbInstance) {
+            console.error("MongoDB not connected");
+            return res.status(500).json({ message: "Database not ready" });
+        }
+        // Remove related hourly records and worker salaries and project data
+        await dbInstance.collection("hourlyprojectrecords").deleteMany({ project_id: projectId });
+        await dbInstance.collection("workersalaries").deleteMany({ project_id: projectId });
+        await dbInstance.collection("project_data").deleteMany({ project_id: projectId });
+        // Remove the main project document
+        const deleted = await Project_1.default.findOneAndDelete({ project_id: projectId });
+        if (!deleted)
+            return res.status(404).json({ message: "Project not found" });
+        res.json({ message: `Project ${projectId} deleted successfully.` });
+    }
+    catch (err) {
+        console.error("Error deleting project:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.deleteProject = deleteProject;
+// Approval Logic for projects
+const normalizeName = (name) => name
+    ?.normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+// Single Entry projects approval logic
+const approveSingleEntryProject = async (req, res) => {
+    try {
+        const { projectId } = req.body;
+        const project = await Project_1.default.findOne({ project_id: projectId });
+        if (!project)
+            return res.status(404).json({ success: false });
+        const projectData = (await ProjectData.findOne({
+            project_id: projectId,
+        }));
+        if (!projectData)
+            return res.status(404).json({ success: false });
+        const users = await user_1.default.find({}, { name: 1 });
+        const userMap = {};
+        users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
+        const salaries = {};
+        const entryCounts = {};
+        projectData.row_data.forEach((row) => {
+            const raw = row[row.length - 1];
+            if (!raw)
+                return;
+            raw.split(",").forEach((name) => {
+                const real = userMap[normalizeName(name)];
+                if (!real)
+                    return;
+                salaries[real] = (salaries[real] || 0) + project.price_worker_one;
+                entryCounts[real] = (entryCounts[real] || 0) + 1;
+            });
+        });
+        const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
+        const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+        const WorkerSalaryCollection = db.collection("workersalaries");
+        const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+        for (const worker of Object.keys(salaries)) {
+            const salary = salaries[worker];
+            const entries = entryCounts[worker];
+            if (!project.is_revised) {
+                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } }, { upsert: true });
+            }
+            else {
+                const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
+                const diffSalary = salary - (old?.salary || 0);
+                const diffEntries = entries - (old?.no_of_entries || 0);
+                if (diffSalary !== 0 || diffEntries !== 0) {
+                    await RevisedWorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { revised_salary: diffSalary, revised_profile_debit: profileDebit, no_of_entries: diffEntries } }, { upsert: true });
+                }
+            }
+        }
+        await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
+        res.json({ success: true, message: "Single entry project approved" });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+    }
+};
+exports.approveSingleEntryProject = approveSingleEntryProject;
+// Approve MultiEntry Projects Logic
+const approveMultiEntryProject = async (req, res) => {
+    try {
+        const { projectId } = req.body;
+        const project = await Project_1.default.findOne({ project_id: projectId });
+        const projectData = (await ProjectData.findOne({
+            project_id: projectId,
+        }));
+        if (!project || !projectData)
+            return res.status(404).json({ success: false });
+        const entryCountMap = {
+            "Double Entry": 2,
+            "Triple Entry": 3,
+            "Four Entry": 4,
+            "Fifth Entry": 5,
+        };
+        // Fix TypeScript error by guarding undefined
+        const numEntries = entryCountMap[project.fixed_option ?? ""] || 1;
+        const priceMap = [
+            project.price_worker_one,
+            project.price_worker_two,
+            project.price_worker_three,
+            project.price_worker_four,
+            project.price_worker_five,
+        ];
+        const users = await user_1.default.find({}, { name: 1 });
+        const userMap = {};
+        users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
+        const salaries = {};
+        const entryCounts = {};
+        projectData.row_data.forEach((row) => {
+            for (let i = 0; i < numEntries; i++) {
+                const raw = row[row.length - numEntries + i];
+                if (!raw)
+                    continue;
+                const real = userMap[normalizeName(raw)];
+                if (!real)
+                    continue;
+                salaries[real] = (salaries[real] || 0) + priceMap[i];
+                entryCounts[real] = (entryCounts[real] || 0) + 1;
+            }
+        });
+        const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
+        const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+        const WorkerSalaryCollection = db.collection("workersalaries");
+        const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+        for (const worker of Object.keys(salaries)) {
+            const salary = salaries[worker];
+            const entries = entryCounts[worker];
+            if (!project.is_revised) {
+                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } }, { upsert: true });
+            }
+            else {
+                const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
+                const diffSalary = salary - (old?.salary || 0);
+                const diffEntries = entries - (old?.no_of_entries || 0);
+                if (diffSalary !== 0 || diffEntries !== 0) {
+                    await RevisedWorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { revised_salary: diffSalary, revised_profile_debit: profileDebit, no_of_entries: diffEntries } }, { upsert: true });
+                }
+            }
+        }
+        await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
+        res.json({ success: true, message: "Multi-entry project approved" });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+    }
+};
+exports.approveMultiEntryProject = approveMultiEntryProject;
+// Lumpsum Project Approval Logic
+const approveLumpsumProject = async (req, res) => {
+    try {
+        const { projectId, salaries, lumpsumPrice } = req.body;
+        const total = salaries.reduce((s, x) => s + x.salary, 0);
+        if (total !== lumpsumPrice)
+            return res.status(400).json({ success: false });
+        const WorkerSalaryCollection = db.collection("workersalaries");
+        for (const { worker, salary } of salaries) {
+            await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: lumpsumPrice } }, { upsert: true });
+        }
+        await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
+        res.json({ success: true, message: "Lumpsum project approved" });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+    }
+};
+exports.approveLumpsumProject = approveLumpsumProject;

@@ -45,4 +45,11 @@ router.get("/payroll-infonav-bwp", adminController_1.getInfonavBwpPayroll);
 router.get("/submitted-projects", adminController_1.getSubmittedProjects);
 router.get("/get-completed-projects", adminController_1.getCompletedProjects);
 router.get("/get-completed-project-names", adminController_1.getCompletedProjectNames);
+// Deletable projects routes
+router.get("/get-deletable-project-names", adminController_1.getDeletableProjectNames);
+router.get("/get-deletable-projects", adminController_1.getDeletableProjects);
+router.delete("/delete-project/:projectId", adminController_1.deleteProject);
+router.post("/approve-single-entry", adminController_1.approveSingleEntryProject);
+router.post("/approve-multi-entry", adminController_1.approveMultiEntryProject);
+router.post("/approve-lumpsum", adminController_1.approveLumpsumProject);
 exports.default = router;
