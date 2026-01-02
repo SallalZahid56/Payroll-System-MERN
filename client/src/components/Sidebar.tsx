@@ -41,7 +41,7 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <aside
-      className={`bg-purple-900 text-white flex flex-col min-h-screen transition-all duration-300 ${
+      className={`bg-purple-900 text-white flex flex-col sticky top-0 h-screen overflow-y-auto transition-all duration-300 ${
         collapsed ? "w-20" : "w-64"
       }`}
     >

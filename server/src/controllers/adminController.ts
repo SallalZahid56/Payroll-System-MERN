@@ -2613,6 +2613,13 @@ export const approveSingleEntryProject = async (
       const salary = salaries[worker];
       const entries = entryCounts[worker];
 
+      // Sanitize existing profile_debit if it's stored as a string (prevent $inc type errors)
+      const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+      if (existing && typeof existing.profile_debit === 'string') {
+        const parsed = Number(existing.profile_debit);
+        await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
+      }
+
       if (!project.is_revised) {
         await WorkerSalaryCollection.updateOne(
           { worker_name: worker, project_id: projectId },
@@ -2708,6 +2715,13 @@ export const approveMultiEntryProject = async (
       const salary = salaries[worker];
       const entries = entryCounts[worker];
 
+      // Sanitize existing profile_debit if stored as a string
+      const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+      if (existing && typeof existing.profile_debit === 'string') {
+        const parsed = Number(existing.profile_debit);
+        await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
+      }
+
       if (!project.is_revised) {
         await WorkerSalaryCollection.updateOne(
           { worker_name: worker, project_id: projectId },
@@ -2756,6 +2770,13 @@ export const approveLumpsumProject = async (
     const WorkerSalaryCollection = db.collection("workersalaries");
 
     for (const { worker, salary } of salaries) {
+      // Sanitize any existing profile_debit field stored as string
+      const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+      if (existing && typeof existing.profile_debit === 'string') {
+        const parsed = Number(existing.profile_debit);
+        await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
+      }
+
       await WorkerSalaryCollection.updateOne(
         { worker_name: worker, project_id: projectId },
         { $inc: { salary, profile_debit: lumpsumPrice } },
