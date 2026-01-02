@@ -13,6 +13,7 @@ import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTa
 import CompletedProjectsTable from "./AdminDashboardSections/CompletedProjects";
 import TopBar from "../components/TopBar";
 import DeleteProjectTable from "./AdminDashboardSections/DeleteProjectTable";
+import ProjectExpenseTable from "./AdminDashboardSections/ProjectExpenseTable";
 
 
 export default function AdminDashboard() {
@@ -55,6 +56,8 @@ export default function AdminDashboard() {
         return <SubmittedProjectsTable />;
       case "delete-projects":
         return <DeleteProjectTable />;
+      case "project-expense":
+        return <ProjectExpenseTable />;
       default:
         return <div className="p-4 text-xl">Welcome, Admin!</div>;
     }
@@ -68,6 +71,7 @@ export default function AdminDashboard() {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
         showDeleteProject // only admin dashboard shows delete-projects
+        showProjectExpense // show Project Expense in admin dashboard
       />
       <div className="flex-1 flex flex-col bg-gray-50 overflow-x-hidden">
         <TopBar /> {/* LOGOUT BUTTON */}

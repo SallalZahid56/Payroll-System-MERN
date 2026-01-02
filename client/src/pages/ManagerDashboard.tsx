@@ -9,6 +9,7 @@ import ManagerFormsMenu from "./ManagerFormsMenu";
 import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
 import UserSubmittedProjectsTable from "./AdminDashboardSections/UserSubmittedProjectsTable";
 import TopBar from "../components/TopBar";
+import ProjectExpenseTable from "./AdminDashboardSections/ProjectExpenseTable";
 
 interface Project {
   _id: string;
@@ -89,6 +90,8 @@ export default function ManagerDashboard() {
         return <ManagerFormsMenu />;
       case "submitted-projects":
         return <SubmittedProjectsTable />;
+      case "project-expense":
+        return <ProjectExpenseTable />;
       default:
         return <div className="p-4 text-xl">Welcome, Manager!</div>;
     }
@@ -96,7 +99,7 @@ export default function ManagerDashboard() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} hideUsers hideUnpricedProjects />
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} hideUsers hideUnpricedProjects showProjectExpense />
       <div className="flex-1 flex flex-col bg-gray-50">
         <TopBar />
         <div className="flex-1 p-6 overflow-x-hidden overflow-y-auto">

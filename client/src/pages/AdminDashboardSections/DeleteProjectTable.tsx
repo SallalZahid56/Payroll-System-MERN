@@ -14,13 +14,46 @@ export default function DeleteProjectTable() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedName, setSelectedName] = useState("");
+  // Single input combines project-name selection and free-form search
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Autocomplete suggestion state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProjectNames();
   }, []);
+
+  // Update suggestions whenever the search term or available names change
+  useEffect(() => {
+    const q = searchTerm.trim().toLowerCase();
+
+    // If input is empty but suggestions were requested (focus), show initial list
+    if (q.length === 0 && showSuggestions) {
+      setFilteredSuggestions(projectNames.slice(0, 200));
+      return;
+    }
+
+    // For one or more characters, filter (allow single-letter matches too)
+    if (q.length >= 1) {
+      setFilteredSuggestions(
+        projectNames.filter((n) => n.toLowerCase().includes(q)).slice(0, 200)
+      );
+      setShowSuggestions(true);
+      return;
+    }
+
+    // Otherwise clear
+    setFilteredSuggestions([]);
+    setShowSuggestions(false);
+  }, [searchTerm, projectNames, showSuggestions]);
+
+  const selectSuggestion = (name: string) => {
+    setSearchTerm(name);
+    setShowSuggestions(false);
+  };
 
   const fetchProjectNames = async () => {
     try {
@@ -29,7 +62,7 @@ export default function DeleteProjectTable() {
     } catch (err) {
       console.error('Error fetching project names:', err);
     }
-  };
+  }; 
 
 
 
@@ -43,7 +76,6 @@ export default function DeleteProjectTable() {
       }
       if (opts?.projectId) params.append('project_id', opts.projectId);
       if (opts?.projectName) params.append('project_name', opts.projectName);
-      if (selectedName) params.append('project_name', selectedName);
 
       const q = params.toString() ? `?${params.toString()}` : '';
       const res = await axios.get<ProjectRow[]>(`/admin/get-deletable-projects${q}`);
@@ -54,7 +86,7 @@ export default function DeleteProjectTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }; 
 
   const handleFetch = () => {
     // If search term is numeric, use project_id; otherwise use project_name
@@ -86,20 +118,32 @@ export default function DeleteProjectTable() {
       <h2 className="text-2xl font-bold mb-4 text-purple-800">🗑️ Delete a Project</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Row 1: Project name (left) and date range (right) */}
+        {/* Row 1: single Project input (left) and date range (right) */}
         <div className="flex items-end gap-4">
-          <div className="flex flex-col w-full">
-            <label className="text-sm text-gray-700">Project</label>
-            <select
+          <div className="flex flex-col w-full relative overflow-visible">
+            <label className="text-sm text-gray-700">Project (name or ID)</label>
+            <input
+              type="text"
+              placeholder="Type project name or numeric ID"
               className="border rounded px-3 py-2 w-full"
-              value={selectedName}
-              onChange={(e) => setSelectedName(e.target.value)}
-            >
-              <option value="">All Projects</option>
-              {projectNames.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => { setShowSuggestions(true); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleFetch(); }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+
+            {showSuggestions && (
+              <ul className="absolute z-50 left-0 right-0 top-full mt-2 bg-white border rounded w-full max-h-72 overflow-y-auto shadow">
+                {filteredSuggestions.length > 0 ? (
+                  filteredSuggestions.map((n) => (
+                    <li key={n} className="px-3 py-2 hover:bg-purple-50 cursor-pointer" onMouseDown={() => selectSuggestion(n)}>{n}</li>
+                  ))
+                ) : (
+                  <li className="px-3 py-2 text-sm text-gray-500">No suggestions</li>
+                )}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -115,24 +159,16 @@ export default function DeleteProjectTable() {
           </div>
         </div>
 
-        {/* Row 2: Search input (left) and action buttons (right) */}
+        {/* Row 2: helper text (left) and action buttons (right) */}
         <div className="flex items-end">
           <div className="flex flex-col flex-1 min-w-0">
-            <label className="text-sm text-gray-700">Search (ID or Name)</label>
-            <input
-              type="text"
-              placeholder="Project ID or Name"
-              className="border rounded px-3 py-2 w-full min-w-0"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleFetch(); }}
-            />
+            <span className="text-xs text-gray-500">Start typing to get project name suggestions (min 2 letters). Numeric input will be treated as Project ID.</span>
           </div>
         </div>
 
         <div className="flex items-end justify-end gap-2">
           <button className="px-4 py-2 bg-purple-700 text-white rounded" onClick={handleFetch}>Search</button>
-          <button className="px-4 py-2 bg-gray-300 rounded" onClick={() => { setSearchTerm(''); setStartDate(''); setEndDate(''); setSelectedName(''); setProjects([]); }}>Clear</button>
+          <button className="px-4 py-2 bg-gray-300 rounded" onClick={() => { setSearchTerm(''); setStartDate(''); setEndDate(''); setProjects([]); setShowSuggestions(false); }}>Clear</button>
           <button className="px-4 py-2 bg-green-600 text-white rounded" onClick={() => fetchProjects()}>Fetch</button>
         </div>
       </div>

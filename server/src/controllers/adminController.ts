@@ -2485,6 +2485,75 @@ export const deleteProject = async (req: Request, res: Response) => {
   }
 };
 
+// -------------------------
+// Project Expense
+// -------------------------
+export const getProjectsList = async (req: Request, res: Response) => {
+  try {
+    const projects = await Project.find({ status: "completed" })
+      .select("project_id project_name")
+      .sort({ created_at: 1 })
+      .lean();
+    res.json(projects);
+  } catch (err) {
+    console.error("Error fetching project list:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getProjectPayroll = async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    if (!projectId) return res.status(400).json({ success: false, message: "Project ID missing." });
+
+    const project = await Project.findOne({ project_id: projectId }).lean();
+    if (!project) return res.status(404).json({ success: false, message: "Project not found." });
+
+    const dbInst = mongoose.connection.db;
+    if (!dbInst) {
+      console.error("MongoDB not connected");
+      return res.status(500).json({ success: false, message: "Database not ready" });
+    }
+
+    // Fixed salaries (workersalaries)
+    const fixed = await dbInst.collection("workersalaries").find({ project_id: projectId }).toArray();
+
+    // Hourly records
+    const hourly = await dbInst.collection("hourlyprojectrecords").find({ project_id: projectId }).toArray();
+
+    const fixedMapped = fixed.map((ws: any) => ({
+      project_id: project.project_id,
+      project_name: project.project_name,
+      sheet_name: ws.sheet_name ?? project.sheet_name ?? "",
+      profile_name: project.profile_name,
+      worker_name: ws.worker_name,
+      salary: ws.salary,
+      entries: ws.no_of_entries ?? ws.entries ?? null,
+      profile_debit: ws.profile_debit ?? null,
+      company: project.company ?? "",
+    }));
+
+    const hourlyMapped = hourly.map((h: any) => ({
+      project_id: project.project_id,
+      project_name: project.project_name,
+      sheet_name: "Hourly Project",
+      profile_name: project.profile_name,
+      worker_name: h.worker_name,
+      salary: h.salary,
+      entries: h.no_of_entries ?? null,
+      profile_debit: null,
+      company: project.company ?? "",
+    }));
+
+    const combined = [...fixedMapped, ...hourlyMapped];
+
+    res.json({ success: true, data: combined });
+  } catch (err) {
+    console.error("Error fetching project payroll:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 
 // Approval Logic for projects
 const normalizeName = (name: string) =>

@@ -39,6 +39,9 @@ import {
   getDeletableProjectNames,
   getDeletableProjects,
   deleteProject,
+  // Project expense endpoints
+  getProjectsList,
+  getProjectPayroll,
   approveSingleEntryProject,
   approveMultiEntryProject,
   approveLumpsumProject
@@ -90,6 +93,10 @@ router.get("/get-completed-project-names", getCompletedProjectNames);
 router.get("/get-deletable-project-names", getDeletableProjectNames);
 router.get("/get-deletable-projects", getDeletableProjects);
 router.delete("/delete-project/:projectId", deleteProject);
+
+// Project Expense routes
+router.get("/projects/list", getProjectsList);
+router.get("/payroll/project/:projectId", getProjectPayroll);
 
 router.post("/approve-single-entry", approveSingleEntryProject);
 router.post("/approve-multi-entry", approveMultiEntryProject);
