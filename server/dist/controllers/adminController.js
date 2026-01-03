@@ -659,7 +659,24 @@ const writeProjectColumns = async (req, res) => {
         const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
         const sheetsList = sheetMeta.data.sheets ?? [];
         const tabName = project.project_name?.trim() || "";
-        const sheetObj = sheetsList.find((s) => s.properties?.title === tabName);
+        // Debug logs to help match sheets when titles differ slightly
+        console.log('Looking for tabName:', tabName);
+        console.log('Available sheets:', sheetsList.map((s) => s.properties?.title));
+        console.log('Normalized sheet titles:', sheetsList.map((s) => String(s.properties?.title || '').replace(/[^\w\s]/g, '').trim().toLowerCase()));
+        // Try exact match first, then normalized match that strips punctuation and compares
+        let sheetObj = sheetsList.find((s) => s.properties?.title === tabName);
+        if (!sheetObj) {
+            const clean = (str = "") => String(str).replace(/[^\w\s]/g, "").trim().toLowerCase();
+            const normalizedTab = clean(tabName);
+            console.log('Normalized tab:', normalizedTab);
+            sheetObj = sheetsList.find((s) => {
+                const title = (s.properties?.title || "").trim();
+                const normalizedTitle = clean(title);
+                return (normalizedTitle === normalizedTab ||
+                    normalizedTitle.includes(normalizedTab) ||
+                    normalizedTab.includes(normalizedTitle));
+            });
+        }
         // If tab not found → return error
         if (!sheetObj || !sheetObj.properties || sheetObj.properties.sheetId === undefined) {
             return res.status(400).json({
