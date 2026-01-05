@@ -2328,7 +2328,13 @@ const approveSingleEntryProject = async (req, res) => {
                 await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
             }
             if (!project.is_revised) {
-                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } }, { upsert: true });
+                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, {
+                    $set: {
+                        salary,
+                        profile_debit: profileDebit,
+                        no_of_entries: entries,
+                    },
+                }, { upsert: true });
             }
             else {
                 const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
@@ -2364,7 +2370,6 @@ const approveMultiEntryProject = async (req, res) => {
             "Four Entry": 4,
             "Fifth Entry": 5,
         };
-        // Fix TypeScript error by guarding undefined
         const numEntries = entryCountMap[project.fixed_option ?? ""] || 1;
         const priceMap = [
             project.price_worker_one,
@@ -2390,21 +2395,20 @@ const approveMultiEntryProject = async (req, res) => {
                 entryCounts[real] = (entryCounts[real] || 0) + 1;
             }
         });
-        const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
-        const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+        // ✅ NEW PROFILE DEBIT: sum of all worker salaries
+        const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
         for (const worker of Object.keys(salaries)) {
             const salary = salaries[worker];
             const entries = entryCounts[worker];
-            // Sanitize existing profile_debit if stored as a string
             const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
             if (existing && typeof existing.profile_debit === 'string') {
                 const parsed = Number(existing.profile_debit);
                 await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
             }
             if (!project.is_revised) {
-                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: profileDebit, no_of_entries: entries } }, { upsert: true });
+                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: profileDebit, no_of_entries: entries } }, { upsert: true });
             }
             else {
                 const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
@@ -2439,7 +2443,7 @@ const approveLumpsumProject = async (req, res) => {
                 const parsed = Number(existing.profile_debit);
                 await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
             }
-            await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $inc: { salary, profile_debit: lumpsumPrice } }, { upsert: true });
+            await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: lumpsumPrice } }, { upsert: true });
         }
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({ success: true, message: "Lumpsum project approved" });
