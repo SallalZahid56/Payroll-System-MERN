@@ -12,9 +12,18 @@ interface Project {
   google_sheet_url?: string;
 }
 
+const multiEntryOptions = [
+  "Double Entry",
+  "Triple Entry",
+  "Fourth Entry",
+  "Fifth Entry",
+];
+
+
 export default function UserSubmittedProjectsTable() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterOption, setFilterOption] = useState("All");
 
   useEffect(() => {
     fetchProjects();
@@ -23,7 +32,6 @@ export default function UserSubmittedProjectsTable() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      // API we will connect later
       const res = await axios.get("/user/get-pending-projects");
       setProjects(res.data.projects || []);
     } catch (err) {
@@ -33,6 +41,26 @@ export default function UserSubmittedProjectsTable() {
       setLoading(false);
     }
   };
+
+  // 🔹 Filtered projects based on fixed_option
+  const filteredProjects = projects.filter((p) => {
+    if (filterOption === "All") return true;
+
+    if (filterOption === "Single Entry") {
+      return p.fixed_option === "Single Entry";
+    }
+
+    if (filterOption === "Multi Entry") {
+      return multiEntryOptions.includes(p.fixed_option || "");
+    }
+
+    if (filterOption === "Lumpsum") {
+      return p.fixed_option === "Lumpsum";
+    }
+
+    return true;
+  });
+
 
   const handleGoToProject = async (projectId: string) => {
     try {
@@ -47,7 +75,6 @@ export default function UserSubmittedProjectsTable() {
       }
 
       await axios.post(`/admin/write-project-columns/${projectId}`);
-
       window.open(res.data.googleSheetUrl, "_blank");
     } catch (err) {
       console.error("Error opening project:", err);
@@ -55,10 +82,11 @@ export default function UserSubmittedProjectsTable() {
     }
   };
 
-
   const handleSubmitProject = async (projectId: string) => {
-    const confirm = window.confirm("Are you sure you want to submit this project?");
-    if (!confirm) return; // Exit if user cancels
+    const confirm = window.confirm(
+      "Are you sure you want to submit this project?"
+    );
+    if (!confirm) return;
 
     try {
       await axios.put(`/user/submit-project/${projectId}`);
@@ -70,18 +98,65 @@ export default function UserSubmittedProjectsTable() {
     }
   };
 
+  // 🔹 Submit all filtered projects
+  const handleSubmitAllProjects = async () => {
+    if (filteredProjects.length === 0) {
+      alert("No projects to submit.");
+      return;
+    }
+
+    const confirm = window.confirm(
+      `Are you sure you want to submit ${filteredProjects.length} projects?`
+    );
+    if (!confirm) return;
+
+    try {
+      for (const project of filteredProjects) {
+        await axios.put(`/user/submit-project/${project._id}`);
+      }
+      alert("All projects submitted successfully!");
+      fetchProjects();
+    } catch (err) {
+      console.error("Error submitting all projects:", err);
+      alert("Failed to submit all projects");
+    }
+  };
 
   return (
-    <div className="bg-white shadow-xl rounded-2xl p-6 overflow-x-auto">
-      <h2 className="text-2xl font-bold mb-4 text-purple-800">
-        Assigned Projects for working and submission
-      </h2>
+    <div className="bg-white shadow-xl rounded-2xl p-6">
+      <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+        <h2 className="text-2xl font-bold text-purple-800">
+          Assigned Projects for working and submission
+        </h2>
+
+        <div className="flex gap-3">
+          {/* 🔹 Fixed Option Filter */}
+          <select
+            value={filterOption}
+            onChange={(e) => setFilterOption(e.target.value)}
+            className="border rounded px-3 py-1 text-sm"
+          >
+            <option value="All">All</option>
+            <option value="Single Entry">Single Entry</option>
+            <option value="Multi Entry">Multi Entry</option>
+            <option value="Lumpsum">Lumpsum</option>
+          </select>
+
+          {/* 🔹 Submit All Button */}
+          <button
+            onClick={handleSubmitAllProjects}
+            className="px-4 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          >
+            📤 Submit All
+          </button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="text-center text-gray-500">Loading projects...</div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div className="text-center text-gray-500">
-          No projects assigned.
+          No projects found.
         </div>
       ) : (
         <table className="min-w-full text-sm border-collapse">
@@ -105,7 +180,7 @@ export default function UserSubmittedProjectsTable() {
           </thead>
 
           <tbody>
-            {projects.map((p) => (
+            {filteredProjects.map((p) => (
               <tr key={p._id} className="hover:bg-purple-50 border-b">
                 <td className="p-3 border-r">{p.project_id}</td>
                 <td className="p-3 border-r">{p.project_name}</td>

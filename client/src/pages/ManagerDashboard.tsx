@@ -100,7 +100,7 @@ export default function ManagerDashboard() {
   return (
     <div className="flex min-h-screen">
       <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} hideUsers hideUnpricedProjects showProjectExpense />
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
         <TopBar />
         <div className="flex-1 p-6 overflow-x-hidden overflow-y-auto">
           {renderSection()}
