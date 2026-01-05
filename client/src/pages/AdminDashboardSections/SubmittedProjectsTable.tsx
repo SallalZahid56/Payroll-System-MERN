@@ -74,7 +74,6 @@ export default function SubmittedProjectsTable() {
     return true;
   });
 
-  // ✅ APPROVE ALL (USED)
   const handleApproveAll = async () => {
     if (filteredProjects.length === 0) {
       alert("No projects to approve.");
@@ -86,8 +85,10 @@ export default function SubmittedProjectsTable() {
     );
     if (!confirmed) return;
 
-    try {
-      for (const project of filteredProjects) {
+    const failedProjects: string[] = [];
+
+    for (const project of filteredProjects) {
+      try {
         let url = "";
         const body: ApproveRequestBody = { projectId: project.project_id };
 
@@ -102,15 +103,26 @@ export default function SubmittedProjectsTable() {
         }
 
         await axios.post(url, body);
+      } catch (err) {
+        console.error(`Failed to approve project ${project.project_id}`, err);
+        failedProjects.push(project.project_id); // log failed project
+        continue; // skip and move to next
       }
+    }
 
+    fetchSubmittedProjects(); // refresh the table
+
+    if (failedProjects.length === 0) {
       alert("All projects approved ✅");
-      fetchSubmittedProjects();
-    } catch (err) {
-      console.error("Approve all failed", err);
-      alert("Failed to approve all projects ❌");
+    } else {
+      alert(
+        `Some projects could not be approved ❌\nFailed project IDs: ${failedProjects.join(
+          ", "
+        )}`
+      );
     }
   };
+
 
   const handleApprove = async (project: Project) => {
     const confirmed = window.confirm("Are you sure you want to APPROVE this project?");

@@ -35,11 +35,9 @@ import {
   getInfonavBwpPayroll,
   getSubmittedProjects,
   getCompletedProjects, getCompletedProjectNames,
-  // New endpoints for deletable projects
   getDeletableProjectNames,
   getDeletableProjects,
   deleteProject,
-  // Project expense endpoints
   getProjectsList,
   getProjectPayroll,
   approveSingleEntryProject,
