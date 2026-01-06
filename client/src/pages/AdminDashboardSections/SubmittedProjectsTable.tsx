@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "../../utils/axios";
+import { LumpsumModal } from "../../components/LumpsumModal";
 
 interface Project {
   _id: string;
@@ -11,6 +12,7 @@ interface Project {
   shift?: string;
   assigned_to?: string;
   google_sheet_url?: string;
+  lumpsum_price?: number;
 }
 
 interface ApproveRequestBody {
@@ -30,6 +32,9 @@ export default function SubmittedProjectsTable() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterOption, setFilterOption] = useState("All");
+  const [lumpsumModalOpen, setLumpsumModalOpen] = useState(false);
+  const [currentLumpsumProject, setCurrentLumpsumProject] = useState<Project | null>(null);
+
 
   useEffect(() => {
     fetchSubmittedProjects();
@@ -124,10 +129,7 @@ export default function SubmittedProjectsTable() {
   };
 
 
-  const handleApprove = async (project: Project) => {
-    const confirmed = window.confirm("Are you sure you want to APPROVE this project?");
-    if (!confirmed) return;
-
+  const approveProjectDirectly = async (project: Project) => {
     try {
       let url = "";
       const body: ApproveRequestBody = { projectId: project.project_id };
@@ -136,11 +138,9 @@ export default function SubmittedProjectsTable() {
         url = "/admin/approve-single-entry";
       } else if (multiEntryOptions.includes(project.fixed_option || "")) {
         url = "/admin/approve-multi-entry";
-      } else if (project.fixed_option === "Lumpsum") {
-        url = "/admin/approve-lumpsum";
-        body.salaries = [];
-        body.lumpsumPrice = 0;
       }
+
+      if (!url) return;
 
       await axios.post(url, body);
       alert("Project approved ✅");
@@ -151,12 +151,52 @@ export default function SubmittedProjectsTable() {
     }
   };
 
-  const handleReject = async (id: string) => {
-    const confirmed = window.confirm("Are you sure you want to REJECT this project?");
+
+
+  const handleApprove = (project: Project) => {
+    if (project.fixed_option === "Lumpsum") {
+      // Open modal
+      setCurrentLumpsumProject(project);
+      setLumpsumModalOpen(true);
+      return;
+    }
+
+    // Existing logic for Single / Multi Entry
+    approveProjectDirectly(project);
+  };
+
+  const approveLumpsum = async (salaries: { worker: string; salary: number }[]) => {
+    if (!currentLumpsumProject) return;
+
+    const total = salaries.reduce((sum, s) => sum + s.salary, 0);
+    const body: ApproveRequestBody = {
+      projectId: currentLumpsumProject.project_id,
+      salaries,
+      lumpsumPrice: total,
+    };
+
+    try {
+      await axios.post("/admin/approve-lumpsum", body);
+      alert("Lumpsum project approved ✅");
+      setLumpsumModalOpen(false);
+      fetchSubmittedProjects();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to approve lumpsum project ❌");
+    }
+  };
+
+  const handleReject = async (projectId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to REJECT this project?"
+    );
     if (!confirmed) return;
 
     try {
-      await axios.post(`/admin/projects/${id}/reject`);
+      await axios.post("/admin/reject-project", {
+        projectId,
+      });
+
       alert("Project rejected ❌");
       fetchSubmittedProjects();
     } catch (err) {
@@ -164,6 +204,7 @@ export default function SubmittedProjectsTable() {
       alert("Failed to reject project ❌");
     }
   };
+
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-6">
@@ -252,7 +293,7 @@ export default function SubmittedProjectsTable() {
                     </button>
 
                     <button
-                      onClick={() => handleReject(p._id)}
+                      onClick={() => handleReject(p.project_id)}
                       className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
                     >
                       ❌ Reject
@@ -264,6 +305,18 @@ export default function SubmittedProjectsTable() {
           </table>
         </div>
       )}
+      {
+        currentLumpsumProject && (
+          <LumpsumModal
+            isOpen={lumpsumModalOpen}
+            onClose={() => setLumpsumModalOpen(false)}
+            projectId={currentLumpsumProject!.project_id} // ✅ add this
+            assignedTo={(currentLumpsumProject!.assigned_to?.split(",") || [])}
+            lumpsumPrice={currentLumpsumProject!.lumpsum_price || 0}
+            onSave={approveLumpsum}
+          />
+        )
+      }
     </div>
   );
 }

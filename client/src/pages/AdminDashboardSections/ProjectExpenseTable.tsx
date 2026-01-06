@@ -46,6 +46,8 @@ export default function ProjectExpenseTable() {
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
   const [suppressSuggestions, setSuppressSuggestions] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editRow, setEditRow] = useState<Partial<ExpenseRow> | null>(null);
 
   useEffect(() => {
     fetchProjectList();
@@ -154,12 +156,11 @@ export default function ProjectExpenseTable() {
       let url = '';
       let body: ApproveRequestBody = { projectId: currentProjectId };
 
-      if (project.fixed_option) {
-        url = '/admin/approve-multi-entry';
-      } else if (project.sheet_name && !project.fixed_option) {
-        url = '/admin/approve-single-entry';
-      } else {
-        // Treat as lumpsum — construct salaries array from current table data
+      // Normalize fixed_option for robust comparisons
+      const fixedOpt = ((project.fixed_option || "") as string).toString().trim().toLowerCase();
+
+      // Lumpsum projects — require salaries + lumpsumPrice
+      if (fixedOpt === 'lumpsum') {
         const salaries = projects
           .filter((r) => r.worker_name && Number.isFinite(r.salary))
           .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
@@ -173,6 +174,49 @@ export default function ProjectExpenseTable() {
 
         url = '/admin/approve-lumpsum';
         body = { projectId: currentProjectId, salaries, lumpsumPrice };
+
+      // Single Entry projects — use single-entry approve endpoint and provide salaries if available
+      } else if (fixedOpt.includes('single')) {
+        const salaries = projects
+          .filter((r) => r.worker_name && Number.isFinite(r.salary))
+          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
+
+        url = '/admin/approve-single-entry';
+        // If we have explicit salaries from the table, send them to the single-entry endpoint
+        if (salaries.length) body = { projectId: currentProjectId, salaries };
+
+      // Multi-entry projects (Double/Triple/Four/Fifth) → multi-entry approve endpoint
+      } else if (
+        fixedOpt.includes('double') ||
+        fixedOpt.includes('triple') ||
+        fixedOpt.includes('four') ||
+        fixedOpt.includes('fifth')
+      ) {
+        url = '/admin/approve-multi-entry';
+
+      // Fallback: if project has a sheet_name but no fixed_option, treat as single-entry
+      } else if (project.sheet_name && !project.fixed_option) {
+        const salaries = projects
+          .filter((r) => r.worker_name && Number.isFinite(r.salary))
+          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
+        url = '/admin/approve-single-entry';
+        if (salaries.length) body = { projectId: currentProjectId, salaries };
+
+      // Final fallback: try lumpsum flow if nothing else matches
+      } else {
+        const salaries = projects
+          .filter((r) => r.worker_name && Number.isFinite(r.salary))
+          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
+        const lumpsumPrice = salaries.reduce((s, x) => s + x.salary, 0);
+
+        if (salaries.length === 0) {
+          alert('Cannot recalculate: unable to determine project type and no salary rows available.');
+          setLoading(false);
+          return;
+        }
+
+        url = '/admin/approve-lumpsum';
+        body = { projectId: currentProjectId, salaries, lumpsumPrice };
       }
 
       await axios.post(url, body);
@@ -180,9 +224,10 @@ export default function ProjectExpenseTable() {
 
       // refresh payroll data to show updated salaries
       await fetchPayrollByProjectId(currentProjectId);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error recalculating project payroll:', err);
-      alert('Failed to recalculate ❌');
+      const msg = err?.response?.data?.message || err?.message || 'Failed to recalculate ❌';
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -285,13 +330,61 @@ export default function ProjectExpenseTable() {
                 <tr key={idx} className="hover:bg-purple-50 transition-colors">
                   <td className="px-4 py-2">{p.project_id}</td>
                   <td className="px-4 py-2">{p.project_name}</td>
-                  <td className="px-4 py-2">{p.sheet_name ?? '-'}</td>
-                  <td className="px-4 py-2">{p.profile_name ?? '-'}</td>
-                  <td className="px-4 py-2">{p.worker_name ?? '-'}</td>
-                  <td className="px-4 py-2">{p.salary?.toFixed?.(2) ?? p.salary ?? '-'}</td>
-                  <td className="px-4 py-2">{p.entries ?? '-'}</td>
-                  <td className="px-4 py-2">{p.profile_debit?.toFixed?.(2) ?? p.profile_debit ?? '-'}</td>
-                  <td className="px-4 py-2">{p.company ?? '-'}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input className="border rounded px-2 py-1 w-40" value={editRow?.sheet_name ?? p.sheet_name ?? ''} onChange={(e)=> setEditRow(r=> ({...(r||{}), sheet_name: e.target.value}))} />
+                  ) : (p.sheet_name ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input className="border rounded px-2 py-1 w-40" value={editRow?.profile_name ?? p.profile_name ?? ''} onChange={(e)=> setEditRow(r=> ({...(r||{}), profile_name: e.target.value}))} />
+                  ) : (p.profile_name ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input className="border rounded px-2 py-1 w-40" value={editRow?.worker_name ?? p.worker_name ?? ''} onChange={(e)=> setEditRow(r=> ({...(r||{}), worker_name: e.target.value}))} />
+                  ) : (p.worker_name ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input type="number" step="0.01" className="border rounded px-2 py-1 w-28" value={editRow?.salary ?? (p.salary ?? 0)} onChange={(e)=> setEditRow(r=> ({...(r||{}), salary: Number(e.target.value)}))} />
+                  ) : (p.salary?.toFixed?.(2) ?? p.salary ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input type="number" className="border rounded px-2 py-1 w-20" value={editRow?.entries ?? (p.entries ?? '')} onChange={(e)=> setEditRow(r=> ({...(r||{}), entries: e.target.value === '' ? null : Number(e.target.value)}))} />
+                  ) : (p.entries ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <input type="number" step="0.01" className="border rounded px-2 py-1 w-28" value={editRow?.profile_debit ?? (p.profile_debit ?? 0)} onChange={(e)=> setEditRow(r=> ({...(r||{}), profile_debit: Number(e.target.value)}))} />
+                  ) : (p.profile_debit?.toFixed?.(2) ?? p.profile_debit ?? '-')}</td>
+                  <td className="px-4 py-2">{editingIndex === idx ? (
+                    <div className="flex gap-2">
+                      <input className="border rounded px-2 py-1 w-28" value={editRow?.company ?? p.company ?? ''} onChange={(e)=> setEditRow(r=> ({...(r||{}), company: e.target.value}))} />
+                      <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={async ()=>{
+                        // Save
+                        try {
+                          const payload = {
+                            project_id: p.project_id,
+                            project_name: editRow?.project_name ?? p.project_name,
+                            sheet_name: editRow?.sheet_name ?? p.sheet_name,
+                            profile_name: editRow?.profile_name ?? p.profile_name,
+                            worker_name: editRow?.worker_name ?? p.worker_name,
+                            original_worker_name: p.worker_name,
+                            salary: editRow?.salary ?? p.salary ?? 0,
+                            entries: editRow?.entries ?? p.entries ?? null,
+                            profile_debit: editRow?.profile_debit ?? p.profile_debit ?? null,
+                            company: editRow?.company ?? p.company ?? null,
+                          };
+
+                          await axios.post('/admin/payroll/update-entry', payload);
+                          setEditingIndex(null);
+                          setEditRow(null);
+                          await fetchPayrollByProjectId(p.project_id);
+                          alert('Row saved');
+                        } catch (err: any) {
+                          console.error('Failed to save row:', err);
+                          alert(err?.response?.data?.message || err?.message || 'Save failed');
+                        }
+                      }}>Save</button>
+                      <button className="px-2 py-1 bg-gray-300 rounded" onClick={()=>{ setEditingIndex(null); setEditRow(null); }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span>{p.company ?? '-'}</span>
+                      <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={()=>{ setEditingIndex(idx); setEditRow({ ...p }); }}>Edit</button>
+                    </div>
+                  )}</td>
                 </tr>
               ))}
             </tbody>

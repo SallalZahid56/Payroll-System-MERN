@@ -10,7 +10,15 @@ type CompanyPayrollRow = {
   worker_entries: number;
   profile_debit: number;
   company: string;
+  fixed_option?: string;
 };
+
+const multiEntryOptions = [
+  "Double Entry",
+  "Triple Entry",
+  "Fourth Entry",
+  "Fifth Entry",
+];
 
 export default function CompanyPayroll() {
   const [companies, setCompanies] = useState<string[]>([]);
@@ -19,6 +27,7 @@ export default function CompanyPayroll() {
   const [endDate, setEndDate] = useState("");
   const [results, setResults] = useState<CompanyPayrollRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filterOption, setFilterOption] = useState("All");
 
   useEffect(() => {
     axios.get("/admin/companies").then((res) => {
@@ -36,11 +45,35 @@ export default function CompanyPayroll() {
     const res = await axios.get(`/admin/payroll-company/${company}`, {
       params: { start_date: startDate, end_date: endDate },
     });
+
     setResults(res.data.data || []);
     setLoading(false);
   };
 
-  const total = results.reduce((s, r) => s + r.profile_debit, 0);
+  const filteredResults = results.filter((r) => {
+    // If backend doesn't send fixed_option, don't block results
+    if (!r.fixed_option || filterOption === "All") return true;
+
+    if (filterOption === "Single Entry") {
+      return r.fixed_option === "Single Entry";
+    }
+
+    if (filterOption === "Multi Entry") {
+      return multiEntryOptions.includes(r.fixed_option);
+    }
+
+    if (filterOption === "Lumpsum") {
+      return r.fixed_option === "Lumpsum";
+    }
+
+    return true;
+  });
+
+  // ✅ TOTAL BASED ON FILTERED RESULTS
+  const total = filteredResults.reduce(
+    (sum, r) => sum + r.profile_debit,
+    0
+  );
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
@@ -59,8 +92,31 @@ export default function CompanyPayroll() {
           ))}
         </select>
 
-        <input type="date" className="border px-3 py-2" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        <input type="date" className="border px-3 py-2" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        <input
+          type="date"
+          className="border px-3 py-2"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+
+        <input
+          type="date"
+          className="border px-3 py-2"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+
+        {/* ✅ FIXED OPTION FILTER */}
+        <select
+          className="border rounded px-3 py-2"
+          value={filterOption}
+          onChange={(e) => setFilterOption(e.target.value)}
+        >
+          <option value="All">All</option>
+          <option value="Single Entry">Single Entry</option>
+          <option value="Multi Entry">Multi Entry</option>
+          <option value="Lumpsum">Lumpsum</option>
+        </select>
 
         <button
           onClick={fetchData}
@@ -80,6 +136,7 @@ export default function CompanyPayroll() {
                 "Project Name",
                 "Profile",
                 "Sheet",
+                "Fixed Option",
                 "Price",
                 "Entries",
                 "Debit",
@@ -93,21 +150,26 @@ export default function CompanyPayroll() {
           </thead>
 
           <tbody>
-            {results.map((r, i) => (
+            {filteredResults.map((r, i) => (
               <tr key={i} className="hover:bg-purple-50">
                 <td className="px-4 py-2">{r.project_id}</td>
                 <td className="px-4 py-2">{r.project_name}</td>
                 <td className="px-4 py-2">{r.profile_name}</td>
                 <td className="px-4 py-2">{r.sheet_name}</td>
+                <td className="px-4 py-2 font-semibold text-purple-700">
+                  {r.fixed_option ?? "—"}
+                </td>
                 <td className="px-4 py-2">{r.price_per_entry}</td>
                 <td className="px-4 py-2">{r.worker_entries}</td>
-                <td className="px-4 py-2 font-semibold">{r.profile_debit.toFixed(2)}</td>
+                <td className="px-4 py-2 font-semibold">
+                  {r.profile_debit.toFixed(2)}
+                </td>
                 <td className="px-4 py-2">{r.company}</td>
               </tr>
             ))}
 
             <tr className="bg-purple-50 font-bold">
-              <td colSpan={6} className="px-4 py-2">
+              <td colSpan={7} className="px-4 py-2">
                 Total
               </td>
               <td className="px-4 py-2">{total.toFixed(2)}</td>

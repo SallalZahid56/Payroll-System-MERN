@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "../../utils/axios";
+import type { AxiosError } from "axios";
 
 interface Project {
   _id: string;
@@ -34,8 +35,9 @@ export default function UserSubmittedProjectsTable() {
     try {
       const res = await axios.get("/user/get-pending-projects");
       setProjects(res.data.projects || []);
-    } catch (err) {
-      console.error("Error fetching user projects:", err);
+    } catch (err: unknown) {
+      const e = err as AxiosError | Error;
+      console.error("Error fetching user projects:", (e as AxiosError).response || e.message || e);
       setProjects([]);
     } finally {
       setLoading(false);
@@ -76,8 +78,9 @@ export default function UserSubmittedProjectsTable() {
 
       await axios.post(`/admin/write-project-columns/${projectId}`);
       window.open(res.data.googleSheetUrl, "_blank");
-    } catch (err) {
-      console.error("Error opening project:", err);
+    } catch (err: unknown) {
+      const e = err as AxiosError | Error;
+      console.error("Error opening project:", (e as AxiosError).response || e.message || e);
       alert("Failed to open the project.");
     }
   };
@@ -92,9 +95,11 @@ export default function UserSubmittedProjectsTable() {
       await axios.put(`/user/submit-project/${projectId}`);
       alert("Project submitted successfully!");
       fetchProjects();
-    } catch (err) {
-      console.error("Error submitting project:", err);
-      alert("Failed to submit project");
+    } catch (err: unknown) {
+      const e = err as AxiosError | Error;
+      console.error("Error submitting project:", (e as AxiosError).response || e.message || e);
+      const serverMsg = ((e as AxiosError)?.response?.data as { message?: string } | undefined)?.message;
+      alert(serverMsg || 'Failed to submit project');
     }
   };
 
@@ -110,15 +115,28 @@ export default function UserSubmittedProjectsTable() {
     );
     if (!confirm) return;
 
+    setLoading(true);
+    const failed: string[] = [];
     try {
       for (const project of filteredProjects) {
-        await axios.put(`/user/submit-project/${project._id}`);
+        try {
+          await axios.put(`/user/submit-project/${project._id}`);
+        } catch (err: unknown) {
+          const e = err as AxiosError | Error;
+          console.error(`Failed to submit ${project.project_id}:`, (e as AxiosError).response || e.message || e);
+          failed.push(project.project_name || project.project_id || project._id);
+        }
       }
-      alert("All projects submitted successfully!");
-      fetchProjects();
-    } catch (err) {
-      console.error("Error submitting all projects:", err);
-      alert("Failed to submit all projects");
+
+      if (failed.length === 0) {
+        alert("All projects submitted successfully!");
+      } else {
+        alert(`Submitted with ${failed.length} failures: ${failed.join(", ")}`);
+      }
+
+      await fetchProjects();
+    } finally {
+      setLoading(false);
     }
   };
 

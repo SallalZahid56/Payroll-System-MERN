@@ -40,9 +40,11 @@ import {
   deleteProject,
   getProjectsList,
   getProjectPayroll,
+  updatePayrollEntry,
   approveSingleEntryProject,
   approveMultiEntryProject,
-  approveLumpsumProject
+  approveLumpsumProject,
+  rejectProject
 } from "../controllers/adminController";
 
 const router = express.Router();
@@ -86,19 +88,16 @@ router.get("/payroll-infonav-bwp", getInfonavBwpPayroll);
 router.get("/submitted-projects", getSubmittedProjects);
 router.get("/get-completed-projects", getCompletedProjects);
 router.get("/get-completed-project-names", getCompletedProjectNames);
-
-// Deletable projects routes
 router.get("/get-deletable-project-names", getDeletableProjectNames);
 router.get("/get-deletable-projects", getDeletableProjects);
 router.delete("/delete-project/:projectId", deleteProject);
-
-// Project Expense routes
 router.get("/projects/list", getProjectsList);
 router.get("/payroll/project/:projectId", getProjectPayroll);
-
+router.post("/payroll/update-entry", updatePayrollEntry);
 router.post("/approve-single-entry", approveSingleEntryProject);
 router.post("/approve-multi-entry", approveMultiEntryProject);
 router.post("/approve-lumpsum", approveLumpsumProject);
+router.post("/reject-project", rejectProject);
 
 
 

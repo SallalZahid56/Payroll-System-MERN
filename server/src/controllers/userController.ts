@@ -15,14 +15,23 @@ export const getPendingAssignedProjects = async (
       return res.status(401).json({ message: "Not logged in" });
     }
 
-    // ✅ USE USER ID (not name)
+    // Prefer matching by assigned_to_ids (stores IDs). Fall back to assigned_to (names) for older records.
     const loggedInUserId = req.user.id;
+    const loggedInUserName = req.user.name;
+
+    const idRegex = new RegExp(`(^|,\\s*)${loggedInUserId}(,|$)`);
+    const nameRegex = new RegExp(`(^|,\\s*)${loggedInUserName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(,|$)`, "i");
 
     const projects = await Project.find({
-      assigned_to: {
-        $regex: new RegExp(`(^|,\\s*)${loggedInUserId}(,|$)`),
-      },
-      status: "assigned", // or "pending" if needed
+      $and: [
+        { status: "assigned" },
+        {
+          $or: [
+            { assigned_to_ids: { $regex: idRegex } },
+            { assigned_to: { $regex: nameRegex } },
+          ],
+        },
+      ],
     }).sort({ createdAt: -1 });
 
     return res.json({ projects });
@@ -50,11 +59,15 @@ export const submitProject = async (req: Request, res: Response) => {
     }
 
     // ✅ Update project status to 'submitted' only if assigned to this user
+    const idRegex = new RegExp(`(^|,\\s*)${req.user.id}(,|$)`);
+    const nameRegex = new RegExp(`(^|,\\s*)${req.user.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(,|$)`, "i");
+
     const project = await Project.findOne({
       _id: projectId,
-      assigned_to: {
-        $regex: new RegExp(`(^|,\\s*)${req.user.id}(,|$)`),
-      },
+      $or: [
+        { assigned_to_ids: { $regex: idRegex } },
+        { assigned_to: { $regex: nameRegex } },
+      ],
     });
 
     if (!project) {

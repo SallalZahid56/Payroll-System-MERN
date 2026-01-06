@@ -3,7 +3,8 @@ import Project from "../models/Project";
 import User from "../models/user";
 import Column from "../models/column";
 import bcrypt from "bcryptjs";
-import { getSheetsClient } from "../config/googleSheets";
+import { getSheetsClient, getAuthClient } from "../config/googleSheets";
+import { google } from "googleapis";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
@@ -443,24 +444,130 @@ export const assignProject = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Project ID required." });
     }
 
-    // Convert arrays to strings for storage (IDs)
-    const assigned_to_ids = (assignedUsers || []).join(",");
-    const assigned_to_coordinators = (assignedCoordinators || []).join(",");
+    // Normalize inputs
+    const userIds: string[] = Array.isArray(assignedUsers)
+      ? assignedUsers
+      : assignedUsers
+      ? [assignedUsers]
+      : [];
 
-    // Save the first assigned user name (or coordinator if no user)
-    const assigned_to = (assignedUsers && assignedUsers.length > 0)
-      ? assignedUsers[0]       // first user name
-      : (assignedCoordinators && assignedCoordinators.length > 0 ? assignedCoordinators[0] : null);
+    const coordinatorIds: string[] = Array.isArray(assignedCoordinators)
+      ? assignedCoordinators
+      : assignedCoordinators
+      ? [assignedCoordinators]
+      : [];
 
+    // Fetch current project to determine removed users & sheet URL
+    const project = await Project.findById(projectId).select("assigned_to_ids google_sheet_url");
+    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+
+    const oldAssignedIds: string[] = project.assigned_to_ids
+      ? project.assigned_to_ids.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
+    // Fetch user details (names & emails)
+    const [users, coordinators] = await Promise.all([
+      userIds.length ? User.find({ _id: { $in: userIds } }, "name email") : [],
+      coordinatorIds.length ? User.find({ _id: { $in: coordinatorIds } }, "name email") : [],
+    ]);
+
+    const userNames = (users as any[]).map((u) => u.name).join(", ");
+    const coordinatorNames = (coordinators as any[]).map((c) => c.name).join(", ");
+
+    const assigned_to = [userNames, coordinatorNames].filter(Boolean).join(", ") || null;
+    const assigned_to_ids = userIds.join(", ") || null;
+    const assigned_to_coordinators = coordinatorIds.join(", ") || null;
+
+    // Update Mongo project document
     await Project.findByIdAndUpdate(projectId, {
+      assigned_to,
       assigned_to_ids,
       assigned_to_coordinators,
-      assigned_to,    // now stores actual user/coordinator name
-      status: (assigned_to ? "assigned" : "pending"),
+      status: assigned_to ? "assigned" : "pending",
       updated_at: new Date(),
     });
 
-    res.json({ success: true, message: "Project assigned successfully!" });
+    // Compute removed users (previously assigned but no longer present)
+    const removedUserIds = oldAssignedIds.filter((id) => !userIds.includes(id));
+
+    // If there's a Google Sheet URL, compute spreadsheetId
+    let spreadsheetId: string | null = null;
+    if (project.google_sheet_url) {
+      try {
+        spreadsheetId = project.google_sheet_url.split("/d/")[1].split("/")[0];
+      } catch (e) {
+        spreadsheetId = null;
+      }
+    }
+
+    // Helper: grant access via Drive API
+    const grantSheetAccess = async (sheetId: string, emails: string[]) => {
+      if (!sheetId || emails.length === 0) return;
+      const auth = getAuthClient();
+      const authClient = await auth.getClient();
+      const drive = google.drive({ version: "v3", auth: authClient });
+
+      for (const email of Array.from(new Set(emails))) {
+        try {
+          await drive.permissions.create({
+            fileId: sheetId,
+            requestBody: {
+              role: "writer",
+              type: "user",
+              emailAddress: email,
+            },
+            fields: "id",
+            sendNotificationEmail: false,
+          });
+        } catch (err: any) {
+          console.error(`Failed to grant access to ${email}:`, err?.message || err);
+        }
+      }
+    };
+
+    // Helper: revoke access via Drive API (find permission by email)
+    const revokeSheetAccess = async (sheetId: string, emails: string[]) => {
+      if (!sheetId || emails.length === 0) return;
+      const auth = getAuthClient();
+      const authClient = await auth.getClient();
+      const drive = google.drive({ version: "v3", auth: authClient });
+
+      try {
+        const resp = await drive.permissions.list({ fileId: sheetId, fields: "permissions(id,emailAddress)" });
+        const perms = resp.data.permissions || [];
+
+        for (const email of emails) {
+          const found = perms.find((p: any) => p.emailAddress === email);
+          if (found && found.id) {
+            try {
+              await drive.permissions.delete({ fileId: sheetId, permissionId: found.id });
+            } catch (err: any) {
+              console.error(`Failed to revoke permission ${found.id} for ${email}:`, err?.message || err);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error("Failed to list/revoke permissions:", err?.message || err);
+      }
+    };
+
+    // Revoke removed users' sheet access
+    if (spreadsheetId && removedUserIds.length > 0) {
+      const removedEmails = await User.find({ _id: { $in: removedUserIds } }, "email").then((docs) => (docs as any[]).map((d) => d.email).filter(Boolean));
+      if (removedEmails.length) await revokeSheetAccess(spreadsheetId, removedEmails);
+    }
+
+    // Grant access to newly assigned users & coordinators
+    const allEmails = [
+      ...(users as any[]).map((u) => u.email),
+      ...(coordinators as any[]).map((c) => c.email),
+    ].filter(Boolean) as string[];
+
+    if (spreadsheetId && allEmails.length) {
+      await grantSheetAccess(spreadsheetId, allEmails);
+    }
+
+    res.json({ success: true, message: "Project assigned successfully!", assigned_to });
 
   } catch (err: any) {
     console.error("❌ Error assigning project:", err);
@@ -2165,6 +2272,7 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
           project_name: { $first: "$project_name" },
           profile_name: { $first: "$profile_name" },
           sheet_name: { $first: "$sheet_name" },
+          fixed_option: { $first: "$fixed_option" },
           price_per_entry: { $first: "$price_worker_one" },
           worker_entries: { $sum: "$entries_num" },
           profile_debit: { $max: "$debit_num" },
@@ -2594,15 +2702,46 @@ export const approveSingleEntryProject = async (
   res: Response
 ) => {
   try {
-    const { projectId } = req.body;
+    const { projectId, salaries: providedSalaries } = req.body as {
+      projectId: string;
+      salaries?: { worker: string; salary: number }[];
+    };
+
+    if (!projectId) return res.status(400).json({ success: false, message: 'projectId is required' });
 
     const project = await Project.findOne({ project_id: projectId });
-    if (!project) return res.status(404).json({ success: false });
+    if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
 
-    const projectData = (await ProjectData.findOne({
-      project_id: projectId,
-    })) as any;
-    if (!projectData) return res.status(404).json({ success: false });
+    const WorkerSalaryCollection = db.collection("workersalaries");
+    const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+
+    // If client provided salaries explicitly, use them (useful when ProjectData isn't available)
+    if (Array.isArray(providedSalaries) && providedSalaries.length > 0) {
+      const total = providedSalaries.reduce((s, x) => s + Number(x.salary || 0), 0);
+
+      for (const { worker, salary } of providedSalaries) {
+        const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
+        if (existing && typeof existing.profile_debit === 'string') {
+          const parsed = Number(existing.profile_debit);
+          await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
+        }
+
+        await WorkerSalaryCollection.updateOne(
+          { worker_name: worker, project_id: projectId },
+          { $set: { salary, profile_debit: total } },
+          { upsert: true }
+        );
+      }
+
+      await Project.updateOne({ project_id: projectId }, { status: "completed" });
+      return res.json({ success: true, message: 'Single entry project approved (from provided salaries)' });
+    }
+
+    // Otherwise, attempt the original ProjectData-driven flow
+    const projectData = (await ProjectData.findOne({ project_id: projectId })) as any;
+    if (!projectData) {
+      return res.status(400).json({ success: false, message: 'Project data not available for single-entry approval. Provide salaries in request body as { salaries: [{ worker, salary }] }.' });
+    }
 
     const users = await User.find({}, { name: 1 });
     const userMap: Record<string, string> = {};
@@ -2619,25 +2758,18 @@ export const approveSingleEntryProject = async (
         const real = userMap[normalizeName(name)];
         if (!real) return;
 
-        salaries[real] = (salaries[real] || 0) + project.price_worker_one!;
+        salaries[real] = (salaries[real] || 0) + (project.price_worker_one ?? 0);
         entryCounts[real] = (entryCounts[real] || 0) + 1;
       });
     });
 
-    const totalEntries = Object.values(entryCounts).reduce<number>(
-      (a, b) => a + b,
-      0
-    );
+    const totalEntries = Object.values(entryCounts).reduce<number>((a, b) => a + b, 0);
     const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
-
-    const WorkerSalaryCollection = db.collection("workersalaries");
-    const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
 
     for (const worker of Object.keys(salaries)) {
       const salary = salaries[worker];
       const entries = entryCounts[worker];
 
-      // Sanitize existing profile_debit if it's stored as a string (prevent $inc type errors)
       const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
       if (existing && typeof existing.profile_debit === 'string') {
         const parsed = Number(existing.profile_debit);
@@ -2647,16 +2779,9 @@ export const approveSingleEntryProject = async (
       if (!project.is_revised) {
         await WorkerSalaryCollection.updateOne(
           { worker_name: worker, project_id: projectId },
-          {
-            $set: {
-              salary,
-              profile_debit: profileDebit,
-              no_of_entries: entries,
-            },
-          },
+          { $set: { salary, profile_debit: profileDebit, no_of_entries: entries } },
           { upsert: true }
         );
-
       } else {
         const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
         const diffSalary = salary - (old?.salary || 0);
@@ -2689,11 +2814,11 @@ export const approveMultiEntryProject = async (
     const { projectId } = req.body;
 
     const project = await Project.findOne({ project_id: projectId });
-    const projectData = (await ProjectData.findOne({
-      project_id: projectId,
-    })) as any;
+    const projectData = await ProjectData.findOne({ project_id: projectId }) as any;
 
-    if (!project || !projectData) return res.status(404).json({ success: false });
+    if (!project || !projectData) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
 
     const entryCountMap: Record<string, number> = {
       "Double Entry": 2,
@@ -2702,37 +2827,45 @@ export const approveMultiEntryProject = async (
       "Fifth Entry": 5,
     };
 
-    const numEntries = entryCountMap[project.fixed_option ?? ""] || 1;
+    const numEntries = entryCountMap[project.fixed_option ?? ""];
+    if (!numEntries) {
+      return res.status(400).json({ success: false, message: "Invalid multi-entry option" });
+    }
 
     const priceMap = [
-      project.price_worker_one,
-      project.price_worker_two,
-      project.price_worker_three,
-      project.price_worker_four,
-      project.price_worker_five,
+      project.price_worker_one ?? 0,
+      project.price_worker_two ?? 0,
+      project.price_worker_three ?? 0,
+      project.price_worker_four ?? 0,
+      project.price_worker_five ?? 0,
     ];
 
+    // Load users
     const users = await User.find({}, { name: 1 });
     const userMap: Record<string, string> = {};
-    users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
+    users.forEach(u => {
+      userMap[normalizeName(u.name)] = u.name;
+    });
 
     const salaries: Record<string, number> = {};
     const entryCounts: Record<string, number> = {};
 
+    // 🔥 Recalculate salaries from scratch
     projectData.row_data.forEach((row: any[]) => {
       for (let i = 0; i < numEntries; i++) {
-        const raw = row[row.length - numEntries + i] as string | undefined;
-        if (!raw) continue;
+        const rawName = row[row.length - numEntries + i];
+        if (!rawName) continue;
 
-        const real = userMap[normalizeName(raw)];
-        if (!real) continue;
+        const normalized = normalizeName(rawName);
+        const realUser = userMap[normalized];
+        if (!realUser) continue;
 
-        salaries[real] = (salaries[real] || 0) + priceMap[i]!;
-        entryCounts[real] = (entryCounts[real] || 0) + 1;
+        const price = priceMap[i] ?? 0;
+        salaries[realUser] = (salaries[realUser] || 0) + price;
+        entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
       }
     });
 
-    // ✅ NEW PROFILE DEBIT: sum of all worker salaries
     const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
 
     const WorkerSalaryCollection = db.collection("workersalaries");
@@ -2742,43 +2875,65 @@ export const approveMultiEntryProject = async (
       const salary = salaries[worker];
       const entries = entryCounts[worker];
 
-      const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
-      if (existing && typeof existing.profile_debit === 'string') {
-        const parsed = Number(existing.profile_debit);
-        await WorkerSalaryCollection.updateOne(
-          { worker_name: worker, project_id: projectId },
-          { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } }
-        );
-      }
+      const existing = await WorkerSalaryCollection.findOne({
+        worker_name: worker,
+        project_id: projectId,
+      }) as any;
 
+      // Normal project → overwrite values
       if (!project.is_revised) {
         await WorkerSalaryCollection.updateOne(
           { worker_name: worker, project_id: projectId },
-          { $set: { salary, profile_debit: profileDebit, no_of_entries: entries } },
+          {
+            $set: {
+              salary,
+              no_of_entries: entries,
+              profile_debit: profileDebit,
+            },
+          },
           { upsert: true }
         );
       } else {
-        const old = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId }) as any;
-        const diffSalary = salary - (old?.salary || 0);
-        const diffEntries = entries - (old?.no_of_entries || 0);
+        // Revised project → calculate diff
+        const oldSalary = existing?.salary || 0;
+        const oldEntries = existing?.no_of_entries || 0;
+
+        const diffSalary = salary - oldSalary;
+        const diffEntries = entries - oldEntries;
 
         if (diffSalary !== 0 || diffEntries !== 0) {
           await RevisedWorkerSalaryCollection.updateOne(
             { worker_name: worker, project_id: projectId },
-            { $inc: { revised_salary: diffSalary, revised_profile_debit: profileDebit, no_of_entries: diffEntries } },
+            {
+              $inc: {
+                revised_salary: diffSalary,
+                revised_profile_debit: diffSalary,
+                no_of_entries: diffEntries,
+              },
+            },
             { upsert: true }
           );
         }
       }
     }
 
+    // ✅ Mark project as completed
     await Project.updateOne({ project_id: projectId }, { status: "completed" });
-    res.json({ success: true, message: "Multi-entry project approved" });
+
+    res.json({
+      success: true,
+      message: project.is_revised
+        ? "Revised multi-entry project recalculated and approved"
+        : "Multi-entry project recalculated and approved",
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Approval failed" });
   }
 };
+
+
+
 
 
 // Lumpsum Project Approval Logic
@@ -2793,9 +2948,16 @@ export const approveLumpsumProject = async (
       lumpsumPrice: number;
     } = req.body;
 
-    const total = salaries.reduce<number>((s, x) => s + x.salary, 0);
-    if (total !== lumpsumPrice)
-      return res.status(400).json({ success: false });
+    // Ensure numbers and allow small floating point tolerances
+    const total = salaries.reduce<number>((s, x) => s + Number(x.salary || 0), 0);
+    const diff = Math.abs(total - Number(lumpsumPrice || 0));
+    const EPS = 0.01; // allow cent-level rounding differences
+    if (salaries.length === 0) {
+      return res.status(400).json({ success: false, message: "No salaries provided for lumpsum approval." });
+    }
+    if (diff > EPS) {
+      return res.status(400).json({ success: false, message: `Salaries total ${total} does not match lumpsumPrice ${lumpsumPrice}.` });
+    }
 
     const WorkerSalaryCollection = db.collection("workersalaries");
 
@@ -2820,5 +2982,158 @@ export const approveLumpsumProject = async (
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false });
+  }
+};
+
+
+// Reject a project
+export const rejectProject = async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    // ✅ Find project
+    const project = await Project.findOne({ project_id: projectId });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found.",
+      });
+    }
+
+    // ✅ Reset project status
+    project.status = "pending";
+    await project.save();
+
+    // ✅ Restore editor access on Google Sheet for assigned users (if sheet exists)
+    try {
+      const assignedIdsRaw: string = (project.assigned_to_ids || "") as any;
+      const assignedIds = assignedIdsRaw
+        ? assignedIdsRaw.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean)
+        : [];
+
+      if (assignedIds.length && project.google_sheet_url) {
+        const users = await User.find({ _id: { $in: assignedIds } }, "email");
+        const emails = (users as any[]).map(u => u.email).filter(Boolean);
+
+        if (emails.length) {
+          // extract spreadsheetId
+          let spreadsheetId: string | null = null;
+          try {
+            spreadsheetId = project.google_sheet_url.split('/d/')[1].split('/')[0];
+          } catch (e) {
+            spreadsheetId = null;
+          }
+
+          if (spreadsheetId) {
+            try {
+              const auth = getAuthClient();
+              const authClient = await auth.getClient();
+              const drive = google.drive({ version: 'v3', auth: authClient });
+
+              for (const email of Array.from(new Set(emails))) {
+                try {
+                  await drive.permissions.create({
+                    fileId: spreadsheetId,
+                    requestBody: { role: 'writer', type: 'user', emailAddress: email },
+                    fields: 'id',
+                    sendNotificationEmail: false,
+                  });
+                } catch (err: any) {
+                  console.error(`Failed to grant access to ${email}:`, err?.message || err);
+                }
+              }
+            } catch (err: any) {
+              console.error('Failed to restore sheet permissions:', err?.message || err);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error while restoring sheet access on reject:', err?.message || err);
+    }
+
+    res.json({
+      success: true,
+      message: "Project rejected successfully.",
+    });
+  } catch (error) {
+    console.error("Error rejecting project:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while rejecting project.",
+    });
+  }
+};
+
+// Update a payroll entry (project + worker salary row)
+export const updatePayrollEntry = async (req: Request, res: Response) => {
+  try {
+    const {
+      project_id,
+      project_name,
+      sheet_name,
+      profile_name,
+      worker_name,
+      original_worker_name,
+      salary,
+      entries,
+      profile_debit,
+      company,
+    } = req.body;
+
+    if (!project_id) {
+      return res.status(400).json({ success: false, message: 'project_id is required' });
+    }
+
+    // Fetch project
+    const project = await Project.findOne({ project_id });
+    if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Update project-level fields if provided
+    const projectUpdate: any = {};
+    if (project_name !== undefined) projectUpdate.project_name = project_name;
+    if (sheet_name !== undefined) projectUpdate.sheet_name = sheet_name;
+    if (profile_name !== undefined) projectUpdate.profile_name = profile_name;
+    if (company !== undefined) projectUpdate.company = company;
+
+    if (Object.keys(projectUpdate).length > 0) {
+      await Project.updateOne({ project_id }, projectUpdate);
+    }
+
+    // Update worker salary row in workersalaries collection
+    const WorkerSalaryCollection = db.collection('workersalaries');
+
+    const searchWorker = original_worker_name || worker_name;
+    if (!searchWorker) {
+      return res.status(400).json({ success: false, message: 'worker_name or original_worker_name is required' });
+    }
+
+    const existing = await WorkerSalaryCollection.findOne({ project_id, worker_name: searchWorker });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Worker salary row not found' });
+    }
+
+    const updateRow: any = {};
+    if (worker_name !== undefined) updateRow.worker_name = worker_name;
+    if (salary !== undefined) updateRow.salary = Number(salary);
+    if (entries !== undefined) updateRow.no_of_entries = Number(entries);
+    if (profile_debit !== undefined) updateRow.profile_debit = Number(profile_debit);
+
+    if (Object.keys(updateRow).length > 0) {
+      await WorkerSalaryCollection.updateOne({ project_id, worker_name: searchWorker }, { $set: updateRow });
+    }
+
+    return res.json({ success: true, message: 'Payroll row updated successfully' });
+  } catch (err: any) {
+    console.error('Error updating payroll entry:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };
