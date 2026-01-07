@@ -1020,6 +1020,14 @@ const getUserPayroll = async (req, res) => {
         // ---------------------
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
+        // Build a tolerant regex pattern from the selected username that ignores
+        // extra whitespace/punctuation and is case-insensitive. This helps match
+        // stored worker_name variations like extra spaces, dashes or commas.
+        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const nameWords = selectedUsername.split(/\W+/).filter(Boolean);
+        const namePattern = nameWords.length
+            ? `^\\W*${nameWords.map(escapeRegex).join("\\W+")}\\W*$`
+            : `^${escapeRegex(selectedUsername)}$`;
         // ---------------------
         // FIXED SALARY PIPELINE
         // ---------------------
@@ -1043,8 +1051,8 @@ const getUserPayroll = async (req, res) => {
             },
             { $unwind: "$ws" },
             {
-                // Case-insensitive username match
-                $match: { "ws.worker_name": { $regex: `^${selectedUsername}$`, $options: "i" } }
+                // tolerant username match (ignores punctuation/extra spaces, case-insensitive)
+                $match: { "ws.worker_name": { $regex: namePattern, $options: "i" } }
             },
             {
                 $lookup: {
@@ -1091,7 +1099,8 @@ const getUserPayroll = async (req, res) => {
         const hourlyPipeline = [
             {
                 $match: {
-                    worker_name: { $regex: `^${selectedUsername}$`, $options: "i" }
+                    // tolerant username match for hourly records too
+                    worker_name: { $regex: namePattern, $options: "i" }
                 }
             },
             {
@@ -2513,6 +2522,7 @@ const approveMultiEntryProject = async (req, res) => {
                 entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
             }
         });
+        // profile debit remains as sum of calculated salaries (as before)
         const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
@@ -2534,7 +2544,7 @@ const approveMultiEntryProject = async (req, res) => {
                 }, { upsert: true });
             }
             else {
-                // Revised project → calculate diff
+                // Revised project → calculate diffs
                 const oldSalary = existing?.salary || 0;
                 const oldEntries = existing?.no_of_entries || 0;
                 const diffSalary = salary - oldSalary;
@@ -2619,7 +2629,7 @@ const rejectProject = async (req, res) => {
         // ✅ Reset project status
         project.status = "pending";
         await project.save();
-        // ✅ Restore editor access on Google Sheet for assigned users (if sheet exists)
+        // Restore editor access on Google Sheet for assigned users (if sheet exists)
         try {
             const assignedIdsRaw = (project.assigned_to_ids || "");
             const assignedIds = assignedIdsRaw
