@@ -1192,6 +1192,15 @@ export const getUserPayroll = async (req: Request, res: Response) => {
     const Projects = db.collection("projects");
     const Hourly = db.collection("hourlyprojectrecords");
 
+    // Build a tolerant regex pattern from the selected username that ignores
+    // extra whitespace/punctuation and is case-insensitive. This helps match
+    // stored worker_name variations like extra spaces, dashes or commas.
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameWords = selectedUsername.split(/\W+/).filter(Boolean);
+    const namePattern = nameWords.length
+      ? `^\\W*${nameWords.map(escapeRegex).join("\\W+")}\\W*$`
+      : `^${escapeRegex(selectedUsername)}$`;
+
     // ---------------------
     // FIXED SALARY PIPELINE
     // ---------------------
@@ -1215,8 +1224,8 @@ export const getUserPayroll = async (req: Request, res: Response) => {
       },
       { $unwind: "$ws" },
       {
-        // Case-insensitive username match
-        $match: { "ws.worker_name": { $regex: `^${selectedUsername}$`, $options: "i" } }
+        // tolerant username match (ignores punctuation/extra spaces, case-insensitive)
+        $match: { "ws.worker_name": { $regex: namePattern, $options: "i" } }
       },
       {
         $lookup: {
@@ -1265,7 +1274,8 @@ export const getUserPayroll = async (req: Request, res: Response) => {
     const hourlyPipeline = [
       {
         $match: {
-          worker_name: { $regex: `^${selectedUsername}$`, $options: "i" }
+          // tolerant username match for hourly records too
+          worker_name: { $regex: namePattern, $options: "i" }
         }
       },
       {
@@ -2866,6 +2876,7 @@ export const approveMultiEntryProject = async (
       }
     });
 
+    // profile debit remains as sum of calculated salaries (as before)
     const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
 
     const WorkerSalaryCollection = db.collection("workersalaries");
@@ -2894,7 +2905,7 @@ export const approveMultiEntryProject = async (
           { upsert: true }
         );
       } else {
-        // Revised project → calculate diff
+        // Revised project → calculate diffs
         const oldSalary = existing?.salary || 0;
         const oldEntries = existing?.no_of_entries || 0;
 

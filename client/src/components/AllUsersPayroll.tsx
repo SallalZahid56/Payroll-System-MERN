@@ -36,7 +36,90 @@ export default function AllUsersPayroll() {
       );
 
       if (res.data.success) {
-        setPayrollResults(res.data.data ?? []);
+        const raw = res.data.data ?? [];
+
+        // normalize and group by worker name (tolerant to spaces/punctuation/case)
+        const normalize = (s: string) =>
+          String(s || "")
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+            .replace(/[^a-z0-9]/gi, "")
+            .toLowerCase()
+            .trim();
+
+        const map = new Map<string, any>();
+
+        raw.forEach((r) => {
+          const orig = (r.worker_name || "").trim();
+          const key = normalize(orig) || "__unknown__";
+
+          if (!map.has(key)) {
+            map.set(key, {
+              worker_name: orig,
+              fixed_salary: 0,
+              hourly_salary: 0,
+              grand_total: 0,
+              fixed_entries: 0,
+              hourly_entries: 0,
+              total_entries: 0,
+              rs_8_entries: 0,
+              rs_12_entries: 0,
+              rs_16_entries: 0,
+              rs_4_entries: 0,
+              other_entries: 0,
+              _nameCounts: new Map<string, number>(),
+            });
+          }
+
+          const acc = map.get(key);
+          acc.fixed_salary += Number(r.fixed_salary || 0);
+          acc.hourly_salary += Number(r.hourly_salary || 0);
+          acc.grand_total += Number(r.grand_total || 0);
+          acc.fixed_entries += Number(r.fixed_entries || 0);
+          acc.hourly_entries += Number(r.hourly_entries || 0);
+          acc.total_entries += Number(r.total_entries || 0);
+          acc.rs_8_entries += Number(r.rs_8_entries || 0);
+          acc.rs_12_entries += Number(r.rs_12_entries || 0);
+          acc.rs_16_entries += Number(r.rs_16_entries || 0);
+          acc.rs_4_entries += Number(r.rs_4_entries || 0);
+          acc.other_entries += Number(r.other_entries || 0);
+
+          const cnt = acc._nameCounts.get(orig) || 0;
+          acc._nameCounts.set(orig, cnt + 1);
+        });
+
+        // build grouped array, pick a representative display name (most common variant)
+        const grouped: PayrollRow[] = Array.from(map.values()).map((v) => {
+          let bestName = v.worker_name;
+          let bestCount = 0;
+          v._nameCounts.forEach((count: number, name: string) => {
+            if (count > bestCount) {
+              bestCount = count;
+              bestName = name;
+            } else if (count === bestCount) {
+              // tie-breaker: prefer name with no extra spaces (shorter trimmed)
+              if (name.trim().length < bestName.trim().length) bestName = name;
+            }
+          });
+
+          return {
+            worker_name: bestName,
+            fixed_salary: Number(v.fixed_salary || 0),
+            hourly_salary: Number(v.hourly_salary || 0),
+            grand_total: Number(v.grand_total || 0),
+            fixed_entries: Number(v.fixed_entries || 0),
+            hourly_entries: Number(v.hourly_entries || 0),
+            total_entries: Number(v.total_entries || 0),
+            rs_8_entries: Number(v.rs_8_entries || 0),
+            rs_12_entries: Number(v.rs_12_entries || 0),
+            rs_16_entries: Number(v.rs_16_entries || 0),
+            rs_4_entries: Number(v.rs_4_entries || 0),
+            other_entries: Number(v.other_entries || 0),
+          };
+        });
+
+        setPayrollResults(grouped);
       } else {
         alert("Failed to fetch payroll data: " + res.data.message);
       }
@@ -45,6 +128,75 @@ export default function AllUsersPayroll() {
       alert("Error fetching payroll data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (payrollResults.length === 0) return alert("No payroll data to download.");
+
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      await import("jspdf-autotable");
+
+      const doc = new jsPDF();
+      const title = `All Users Payroll (${startDate} to ${endDate})`;
+      doc.setFontSize(12);
+      doc.text(title, 14, 14);
+
+      const head = [[
+        "Worker Name",
+        "Fixed Salary",
+        "Hourly Salary",
+        "Grand Total",
+        "Fixed Entries",
+        "Hourly Entries",
+        "Total Entries",
+        "RS 8 Entries",
+        "RS 12 Entries",
+        "RS 16 Entries",
+        "RS 4 Entries",
+        "Other Entries",
+      ]];
+
+      const body = payrollResults.map(r => [
+        r.worker_name || "",
+        (Number(r.fixed_salary) || 0).toFixed(2),
+        (Number(r.hourly_salary) || 0).toFixed(2),
+        (Number(r.grand_total) || 0).toFixed(2),
+        String(r.fixed_entries || ""),
+        String(r.hourly_entries || ""),
+        String(r.total_entries || ""),
+        String(r.rs_8_entries || ""),
+        String(r.rs_12_entries || ""),
+        String(r.rs_16_entries || ""),
+        String(r.rs_4_entries || ""),
+        String(r.other_entries || ""),
+      ]);
+
+      // totals row
+      body.push([
+        "Total",
+        totalRow.fixed_salary.toFixed(2),
+        totalRow.hourly_salary.toFixed(2),
+        totalRow.grand_total.toFixed(2),
+        String(totalRow.fixed_entries),
+        String(totalRow.hourly_entries),
+        String(totalRow.total_entries),
+        String(totalRow.rs_8_entries),
+        String(totalRow.rs_12_entries),
+        String(totalRow.rs_16_entries),
+        String(totalRow.rs_4_entries),
+        String(totalRow.other_entries),
+      ]);
+
+      ;(doc as unknown as { autoTable: (opts: { head: unknown; body: unknown; startY?: number; styles?: unknown; headStyles?: unknown }) => void })
+        .autoTable({ head, body, startY: 20, styles: { fontSize: 8 }, headStyles: { fillColor: [147, 51, 234] } });
+
+      const filename = `all_users_payroll_${startDate}_${endDate}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Make sure dependencies are installed.");
     }
   };
 
@@ -108,6 +260,13 @@ export default function AllUsersPayroll() {
           disabled={loading}
         >
           {loading ? "Fetching..." : "Fetch All Users Payroll"}
+        </button>
+        <button
+          className="px-4 py-2 ml-2 bg-blue-600 text-white rounded"
+          onClick={handleDownloadPdf}
+          disabled={payrollResults.length === 0}
+        >
+          Download PDF
         </button>
       </div>
 

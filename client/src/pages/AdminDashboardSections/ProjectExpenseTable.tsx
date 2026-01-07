@@ -153,37 +153,32 @@ export default function ProjectExpenseTable() {
         return;
       }
 
+      // Sync project data from Google Sheets into the DB so server approval logic uses fresh data
+      try {
+        await axios.post('/admin/sync-project-data');
+      } catch (err) {
+        console.error('Failed to sync project data before recalculation:', err);
+        alert('Failed to sync project data. Aborting recalculation.');
+        setLoading(false);
+        return;
+      }
+
       let url = '';
       let body: ApproveRequestBody = { projectId: currentProjectId };
 
       // Normalize fixed_option for robust comparisons
       const fixedOpt = ((project.fixed_option || "") as string).toString().trim().toLowerCase();
 
-      // Lumpsum projects — require salaries + lumpsumPrice
+      // Lumpsum projects — after sync, let server calculate using ProjectData
       if (fixedOpt === 'lumpsum') {
-        const salaries = projects
-          .filter((r) => r.worker_name && Number.isFinite(r.salary))
-          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
-        const lumpsumPrice = salaries.reduce((s, x) => s + x.salary, 0);
-
-        if (salaries.length === 0) {
-          alert('Cannot recalculate lumpsum: no worker salary rows available.');
-          setLoading(false);
-          return;
-        }
-
         url = '/admin/approve-lumpsum';
-        body = { projectId: currentProjectId, salaries, lumpsumPrice };
+        body = { projectId: currentProjectId };
 
       // Single Entry projects — use single-entry approve endpoint and provide salaries if available
       } else if (fixedOpt.includes('single')) {
-        const salaries = projects
-          .filter((r) => r.worker_name && Number.isFinite(r.salary))
-          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
-
+        // After sync, prefer server-side calculation from ProjectData. Do not send client table salaries.
         url = '/admin/approve-single-entry';
-        // If we have explicit salaries from the table, send them to the single-entry endpoint
-        if (salaries.length) body = { projectId: currentProjectId, salaries };
+        body = { projectId: currentProjectId };
 
       // Multi-entry projects (Double/Triple/Four/Fifth) → multi-entry approve endpoint
       } else if (
@@ -193,30 +188,18 @@ export default function ProjectExpenseTable() {
         fixedOpt.includes('fifth')
       ) {
         url = '/admin/approve-multi-entry';
-
+        body = { projectId: currentProjectId };
       // Fallback: if project has a sheet_name but no fixed_option, treat as single-entry
       } else if (project.sheet_name && !project.fixed_option) {
-        const salaries = projects
-          .filter((r) => r.worker_name && Number.isFinite(r.salary))
-          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
+        // fallback to server calculation
         url = '/admin/approve-single-entry';
-        if (salaries.length) body = { projectId: currentProjectId, salaries };
+        body = { projectId: currentProjectId };
 
       // Final fallback: try lumpsum flow if nothing else matches
       } else {
-        const salaries = projects
-          .filter((r) => r.worker_name && Number.isFinite(r.salary))
-          .map((r) => ({ worker: r.worker_name!, salary: Number(r.salary) }));
-        const lumpsumPrice = salaries.reduce((s, x) => s + x.salary, 0);
-
-        if (salaries.length === 0) {
-          alert('Cannot recalculate: unable to determine project type and no salary rows available.');
-          setLoading(false);
-          return;
-        }
-
+        // final fallback: use server-side lumpsum approval based on synced data
         url = '/admin/approve-lumpsum';
-        body = { projectId: currentProjectId, salaries, lumpsumPrice };
+        body = { projectId: currentProjectId };
       }
 
       await axios.post(url, body);

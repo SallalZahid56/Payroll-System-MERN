@@ -57,6 +57,64 @@ export default function UserPayroll() {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (payrollResults.length === 0) return alert("No payroll data to download.");
+
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      await import("jspdf-autotable");
+
+      const doc = new jsPDF();
+      const title = `Payroll - ${selectedUser} (${startDate} to ${endDate})`;
+      doc.setFontSize(12);
+      doc.text(title, 14, 14);
+
+      const head = [[
+        "Project ID",
+        "Project Name",
+        "Worker Name",
+        "Profile Name",
+        "Salary",
+        "Entries",
+        "Revised Salary",
+        "Revised Entries",
+        "Company",
+      ]];
+
+      const body = payrollResults.map((r) => [
+        r.project_id || "",
+        r.project_name || "",
+        r.user_name || "",
+        r.profile_name || "",
+        (Number(r.salary) || 0).toFixed(2),
+        String(r.no_of_entries || ""),
+        (Number(r.revised_salary) || 0).toFixed(2),
+        String(r.revised_entries || ""),
+        r.company || "",
+      ]);
+
+      // add totals row
+      const totalSalary = payrollResults.reduce((acc, row) => acc + Number(row.salary || 0), 0);
+      const totalEntries = payrollResults.reduce((acc, row) => acc + Number(row.no_of_entries || 0), 0);
+      body.push(["", "", "", "Total", totalSalary.toFixed(2), String(totalEntries), "", "", ""]);
+
+      ;(doc as unknown as { autoTable: (opts: { head: unknown; body: unknown; startY?: number; styles?: unknown; headStyles?: unknown }) => void })
+        .autoTable({
+          head,
+          body,
+          startY: 20,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [147, 51, 234] },
+        });
+
+      const filename = `payroll_${selectedUser.replace(/\s+/g, "_")}_${startDate}_${endDate}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Make sure dependencies are installed.");
+    }
+  };
+
   const totalSalary = payrollResults.reduce((acc, row) => acc + Number(row.salary || 0), 0);
   const totalEntries = payrollResults.reduce((acc, row) => acc + Number(row.no_of_entries || 0), 0);
 
@@ -105,6 +163,13 @@ export default function UserPayroll() {
           disabled={loading}
         >
           {loading ? "Fetching..." : "Fetch"}
+        </button>
+        <button
+          className="ml-2 px-4 py-2 bg-blue-600 text-white rounded"
+          onClick={handleDownloadPdf}
+          disabled={payrollResults.length === 0}
+        >
+          Download PDF
         </button>
       </div>
 
