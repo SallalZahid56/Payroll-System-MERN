@@ -54,7 +54,7 @@ export function LumpsumModal({ isOpen, onClose, projectId, assignedTo, lumpsumPr
             <tr>
               <th className="border p-2">Worker Name</th>
               <th className="border p-2">Salary</th>
-              <th className="border p-2">Remaining</th>
+              <th className="border p-2">Lumpsum Price</th>
             </tr>
           </thead>
           <tbody>
@@ -70,7 +70,7 @@ export function LumpsumModal({ isOpen, onClose, projectId, assignedTo, lumpsumPr
                     onChange={(e) => handleChange(i, parseFloat(e.target.value) || 0)}
                   />
                 </td>
-                <td className="border p-2">{i === 0 ? remaining : ""}</td>
+                <td className="border p-2">{remaining}</td>
               </tr>
             ))}
           </tbody>
@@ -82,9 +82,21 @@ export function LumpsumModal({ isOpen, onClose, projectId, assignedTo, lumpsumPr
             </tr>
           </tfoot>
         </table>
+        {remaining !== 0 && (
+          <div className="text-sm text-red-600 mb-3">
+            Remaining must be 0 to approve. Current remaining: {remaining}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2">
           <button className="px-4 py-2 bg-gray-300 rounded" onClick={onClose}>Cancel</button>
-          <button className="px-4 py-2 bg-green-600 text-white rounded" onClick={handleSave}>Save & Approve</button>
+          <button
+            className={`px-4 py-2 rounded text-white ${remaining !== 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
+            onClick={handleSave}
+            disabled={remaining !== 0}
+          >
+            Save & Approve
+          </button>
         </div>
       </div>
     </div>

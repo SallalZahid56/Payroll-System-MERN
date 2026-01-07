@@ -3012,7 +3012,7 @@ export const rejectProject = async (req: Request, res: Response) => {
     project.status = "pending";
     await project.save();
 
-    // ✅ Restore editor access on Google Sheet for assigned users (if sheet exists)
+    // Restore editor access on Google Sheet for assigned users (if sheet exists)
     try {
       const assignedIdsRaw: string = (project.assigned_to_ids || "") as any;
       const assignedIds = assignedIdsRaw
