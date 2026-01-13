@@ -2369,137 +2369,6 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
   }
 };
 
-// -------------------- 🔹 INFONAV - TEAM BWP PAYROLL --------------------
-export const getInfonavBwpPayroll = async (req: Request, res: Response) => {
-  try {
-    const { start_date, end_date } = req.query;
-
-    if (!start_date || !end_date) {
-      return res.status(400).json({
-        success: false,
-        message: "Start and end date are required.",
-      });
-    }
-
-    const start = new Date(start_date as string);
-    const end = new Date(end_date as string);
-    end.setHours(23, 59, 59, 999);
-
-    const WorkerSalaries = db.collection("workersalaries");
-    const HourlyRecords = db.collection("hourlyprojectrecords");
-
-    /* ================= FIXED PROJECTS (BWP) ================= */
-    const fixed = await WorkerSalaries.aggregate([
-      {
-        $lookup: {
-          from: "projects",
-          localField: "project_id",
-          foreignField: "project_id",
-          as: "p",
-        },
-      },
-      { $unwind: "$p" },
-
-      // 🔴 MISSING FILTER (THIS IS THE BUG)
-      {
-        $match: {
-          worker_name: "BWP",
-          "p.company": "infonav",
-          "p.status": "completed",
-          $expr: {
-            $and: [
-              { $gte: [{ $toDate: "$p.updated_at" }, start] },
-              { $lte: [{ $toDate: "$p.updated_at" }, end] },
-            ],
-          },
-        },
-      },
-
-      {
-        $addFields: {
-          salary_num: { $toDouble: "$salary" },
-          entries_num: { $toDouble: "$no_of_entries" },
-        },
-      },
-
-      {
-        $group: {
-          _id: "$project_id",
-          project_id: { $first: "$project_id" },
-          project_name: { $first: "$p.project_name" },
-          worker_name: { $first: "$worker_name" },
-          price_per_entry: { $first: "$p.price_worker_one" },
-          sheet_name: { $first: "$p.sheet_name" },
-          profile_name: { $first: "$p.profile_name" },
-          entries: { $sum: "$entries_num" },
-          salary: { $sum: "$salary_num" },
-          company: { $first: "$p.company" },
-        },
-      },
-    ]).toArray();
-
-
-    /* ================= HOURLY PROJECTS (BWP) ================= */
-    const hourly = await HourlyRecords.aggregate([
-      {
-        $lookup: {
-          from: "projects",
-          localField: "project_id",
-          foreignField: "project_id",
-          as: "p",
-        },
-      },
-      { $unwind: "$p" },
-
-      // MISSING FILTER
-      {
-        $match: {
-          worker_name: "BWP",
-          "p.company": "infonav",
-          "p.status": "completed",
-          $expr: {
-            $and: [
-              { $gte: [{ $toDate: "$p.updated_at" }, start] },
-              { $lte: [{ $toDate: "$p.updated_at" }, end] },
-            ],
-          },
-        },
-      },
-
-      {
-        $addFields: {
-          salary_num: { $toDouble: "$salary" },
-          hours_num: { $toDouble: "$runned_hours" },
-        },
-      },
-
-      {
-        $group: {
-          _id: "$project_id",
-          project_id: { $first: "$project_id" },
-          project_name: { $first: "$p.project_name" },
-          worker_name: { $first: "$worker_name" },
-          price_per_entry: { $first: "$p.price_per_hour" },
-          sheet_name: { $first: "$p.sheet_name" },
-          profile_name: { $first: "$p.profile_name" },
-          entries: { $sum: "$hours_num" },
-          salary: { $sum: "$salary_num" },
-          company: { $first: "$p.company" },
-        },
-      },
-    ]).toArray();
-
-
-    res.json({
-      success: true,
-      data: [...fixed, ...hourly],
-    });
-  } catch (err) {
-    console.error("Infonav BWP payroll error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
 /* ===========================
    GET SUBMITTED PROJECTS
 =========================== */
@@ -3146,5 +3015,243 @@ export const updatePayrollEntry = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error updating payroll entry:', err);
     return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+};
+
+// -------------------- 🔹 PAYROLL INFONAV BWP --------------------
+export const getPayrollInfonavBwp = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date } = req.query;
+
+    if (!start_date || !end_date) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Start and end date are required." });
+    }
+
+    const start = new Date(start_date as string);
+    const end = new Date(end_date as string);
+    end.setHours(23, 59, 59, 999);
+
+    const Projects = db.collection("projects");
+    const Hourly = db.collection("hourlyprojectrecords");
+
+    // Fixed Projects: only BWP
+    const fixedPipeline: any[] = [
+      {
+        $match: {
+          company: { $regex: /^infonav$/i },
+          status: "completed",
+          updated_at: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $lookup: {
+          from: "workersalaries",
+          localField: "project_id",
+          foreignField: "project_id",
+          as: "ws",
+        },
+      },
+      { $unwind: "$ws" },
+      { $match: { "ws.worker_name": { $regex: /^BWP$/i } } },
+      {
+        $addFields: {
+          ws_salary_num: {
+            $convert: { input: "$ws.salary", to: "double", onError: 0, onNull: 0 },
+          },
+          ws_entries_num: {
+            $convert: { input: "$ws.no_of_entries", to: "double", onError: 0, onNull: 0 },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$project_id",
+          project_id: { $first: "$project_id" },
+          project_name: { $first: "$project_name" },
+          worker_name: { $first: "$ws.worker_name" },
+          price_per_entry: { $first: "$price_worker_one" },
+          sheet_name: { $first: "$sheet_name" },
+          profile_name: { $first: "$profile_name" },
+          entries: { $sum: "$ws_entries_num" },
+          salary: { $sum: "$ws_salary_num" },
+          company: { $first: "$company" },
+          type: { $first: "Fixed" },
+        },
+      },
+      { $sort: { project_id: 1 } },
+    ];
+
+    const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
+
+    // Hourly Projects: only BWP
+    const hourlyPipeline: any[] = [
+      {
+        $lookup: {
+          from: "projects",
+          localField: "project_id",
+          foreignField: "project_id",
+          as: "p",
+        },
+      },
+      { $unwind: "$p" },
+      {
+        $match: {
+          "p.company": { $regex: /^infonav$/i },
+          "p.status": "completed",
+          "p.updated_at": { $gte: start, $lte: end },
+          worker_name: { $regex: /^BWP$/i },
+        },
+      },
+      {
+        $addFields: {
+          salary_num: { $convert: { input: "$salary", to: "double", onError: 0, onNull: 0 } },
+          entries_num: { $convert: { input: "$runned_hours", to: "double", onError: 0, onNull: 0 } },
+        },
+      },
+      {
+        $group: {
+          _id: "$project_id",
+          project_id: { $first: "$project_id" },
+          project_name: { $first: "$p.project_name" },
+          worker_name: { $first: "$worker_name" },
+          price_per_entry: { $first: null },
+          sheet_name: { $first: null },
+          profile_name: { $first: "$p.profile_name" },
+          entries: { $sum: "$entries_num" },
+          salary: { $sum: "$salary_num" },
+          company: { $first: "$p.company" },
+          type: { $first: "Hourly" },
+        },
+      },
+      { $sort: { project_id: 1 } },
+    ];
+
+    const hourlyResults = await Hourly.aggregate(hourlyPipeline).toArray();
+
+    res.json({ success: true, data: [...fixedResults, ...hourlyResults] });
+  } catch (err: any) {
+    console.error("Infonav BWP payroll error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// -------------------- 🔹 PAYROLL FZ BWP --------------------
+export const getPayrollFzBwp = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date } = req.query;
+
+    if (!start_date || !end_date) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Start and end date are required." });
+    }
+
+    const start = new Date(start_date as string);
+    const end = new Date(end_date as string);
+    end.setHours(23, 59, 59, 999);
+
+    const Projects = db.collection("projects");
+    const Hourly = db.collection("hourlyprojectrecords");
+
+    // Fixed Projects: only BWP for freelancerszone
+    const fixedPipeline: any[] = [
+      {
+        $match: {
+          company: { $regex: /^freelancerszone$/i },
+          status: "completed",
+          updated_at: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $lookup: {
+          from: "workersalaries",
+          localField: "project_id",
+          foreignField: "project_id",
+          as: "ws",
+        },
+      },
+      { $unwind: "$ws" },
+      { $match: { "ws.worker_name": { $regex: /^BWP$/i } } },
+      {
+        $addFields: {
+          ws_salary_num: {
+            $convert: { input: "$ws.salary", to: "double", onError: 0, onNull: 0 },
+          },
+          ws_entries_num: {
+            $convert: { input: "$ws.no_of_entries", to: "double", onError: 0, onNull: 0 },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$project_id",
+          project_id: { $first: "$project_id" },
+          project_name: { $first: "$project_name" },
+          worker_name: { $first: "$ws.worker_name" },
+          price_per_entry: { $first: "$price_worker_one" },
+          sheet_name: { $first: "$sheet_name" },
+          profile_name: { $first: "$profile_name" },
+          entries: { $sum: "$ws_entries_num" },
+          salary: { $sum: "$ws_salary_num" },
+          company: { $first: "$company" },
+          type: { $first: "Fixed" },
+        },
+      },
+      { $sort: { project_id: 1 } },
+    ];
+
+    const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
+
+    // Hourly Projects: only BWP
+    const hourlyPipeline: any[] = [
+      {
+        $lookup: {
+          from: "projects",
+          localField: "project_id",
+          foreignField: "project_id",
+          as: "p",
+        },
+      },
+      { $unwind: "$p" },
+      {
+        $match: {
+          "p.company": { $regex: /^freelancerszone$/i },
+          "p.status": "completed",
+          "p.updated_at": { $gte: start, $lte: end },
+          worker_name: { $regex: /^BWP$/i },
+        },
+      },
+      {
+        $addFields: {
+          salary_num: { $convert: { input: "$salary", to: "double", onError: 0, onNull: 0 } },
+          entries_num: { $convert: { input: "$runned_hours", to: "double", onError: 0, onNull: 0 } },
+        },
+      },
+      {
+        $group: {
+          _id: "$project_id",
+          project_id: { $first: "$project_id" },
+          project_name: { $first: "$p.project_name" },
+          worker_name: { $first: "$worker_name" },
+          price_per_entry: { $first: null },
+          sheet_name: { $first: null },
+          profile_name: { $first: "$p.profile_name" },
+          entries: { $sum: "$entries_num" },
+          salary: { $sum: "$salary_num" },
+          company: { $first: "$p.company" },
+          type: { $first: "Hourly" },
+        },
+      },
+      { $sort: { project_id: 1 } },
+    ];
+
+    const hourlyResults = await Hourly.aggregate(hourlyPipeline).toArray();
+
+    res.json({ success: true, data: [...fixedResults, ...hourlyResults] });
+  } catch (err: any) {
+    console.error("FZ BWP payroll error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

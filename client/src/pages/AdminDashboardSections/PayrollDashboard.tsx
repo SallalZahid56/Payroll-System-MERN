@@ -7,6 +7,7 @@ import FilteredProfilesPayroll from "../../components/FilteredProfilesPayroll";
 import FilteredBWPProfilesPayroll from "../../components/FilteredBwpPayroll";
 import CompanyPayroll from "../../components/CompanyPayroll";
 import InfonavBwpPayroll from "../../components/InfonavBwpPayroll";
+import FzBwpPayroll from "../../components/FzBwpPayroll";
 
 
 interface PayrollMenuItem {
@@ -90,6 +91,7 @@ export default function PayrollDashboard({ onCardClick }: PayrollDashboardProps)
             {activePayroll === "filtered-profiles-payroll-nonbwp" && <FilteredBWPProfilesPayroll />}
             {activePayroll === "company-payroll" && <CompanyPayroll />}
             {activePayroll === "bwp-payroll" && <InfonavBwpPayroll />}
+            {activePayroll === "freelancerszone-bwp-payroll" && <FzBwpPayroll />}
             {/* Add other payroll components as needed */}
           </div>
         </div>

@@ -30,9 +30,10 @@ import {
   getAllProfilesPayroll,
   getFilteredProfilesPayroll,
   getFilteredBWPProfilesPayroll,
+  getPayrollInfonavBwp,
+  getPayrollFzBwp,
   getCompanies,
   getCompanyPayroll,
-  getInfonavBwpPayroll,
   getSubmittedProjects,
   getCompletedProjects, getCompletedProjectNames,
   getDeletableProjectNames,
@@ -82,9 +83,10 @@ router.get("/payroll-profile/:profileName", getProfilePayroll);
 router.get("/payroll-profiles", getAllProfilesPayroll);
 router.get("/payroll-filtered-profiles", getFilteredProfilesPayroll);
 router.get("/payroll-filtered-profiles-nonbwp", getFilteredBWPProfilesPayroll);
+router.get("/payroll-infonav-bwp", getPayrollInfonavBwp);
+router.get("/payroll-fz-bwp", getPayrollFzBwp);
 router.get("/companies", getCompanies);
 router.get("/payroll-company/:company", getCompanyPayroll);
-router.get("/payroll-infonav-bwp", getInfonavBwpPayroll);
 router.get("/submitted-projects", getSubmittedProjects);
 router.get("/get-completed-projects", getCompletedProjects);
 router.get("/get-completed-project-names", getCompletedProjectNames);

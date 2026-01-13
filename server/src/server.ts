@@ -12,6 +12,8 @@ import profileRoutes from "./routes/profileRoutes";
 import userRoutes from "./routes/userRoutes";
 import { startInactiveResetScheduler } from "./utils/startInactiveResetScheduler";
 
+
+console.log("🔍 Loaded MONGO_URI:", process.env.MONGO_URI);
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI as string;
