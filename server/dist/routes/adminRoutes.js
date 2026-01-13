@@ -39,9 +39,10 @@ router.get("/payroll-profile/:profileName", adminController_1.getProfilePayroll)
 router.get("/payroll-profiles", adminController_1.getAllProfilesPayroll);
 router.get("/payroll-filtered-profiles", adminController_1.getFilteredProfilesPayroll);
 router.get("/payroll-filtered-profiles-nonbwp", adminController_1.getFilteredBWPProfilesPayroll);
+router.get("/payroll-infonav-bwp", adminController_1.getPayrollInfonavBwp);
+router.get("/payroll-fz-bwp", adminController_1.getPayrollFzBwp);
 router.get("/companies", adminController_1.getCompanies);
 router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
-router.get("/payroll-infonav-bwp", adminController_1.getInfonavBwpPayroll);
 router.get("/submitted-projects", adminController_1.getSubmittedProjects);
 router.get("/get-completed-projects", adminController_1.getCompletedProjects);
 router.get("/get-completed-project-names", adminController_1.getCompletedProjectNames);
