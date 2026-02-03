@@ -2508,64 +2508,19 @@ const rejectProject = async (req, res) => {
                 message: "Project not found.",
             });
         }
-        // ✅ Reset project status
+        // ✅ Reset project status and clear assignment
         project.status = "pending";
+        project.assigned_to = "";
+        project.assigned_to_ids = "";
         await project.save();
-        // Restore editor access on Google Sheet for assigned users (if sheet exists)
-        try {
-            const assignedIdsRaw = (project.assigned_to_ids || "");
-            const assignedIds = assignedIdsRaw
-                ? assignedIdsRaw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
-                : [];
-            if (assignedIds.length && project.google_sheet_url) {
-                const users = await user_1.default.find({ _id: { $in: assignedIds } }, "email");
-                const emails = users.map(u => u.email).filter(Boolean);
-                if (emails.length) {
-                    // extract spreadsheetId
-                    let spreadsheetId = null;
-                    try {
-                        spreadsheetId = project.google_sheet_url.split('/d/')[1].split('/')[0];
-                    }
-                    catch (e) {
-                        spreadsheetId = null;
-                    }
-                    if (spreadsheetId) {
-                        try {
-                            const auth = (0, googleSheets_1.getAuthClient)();
-                            const authClient = await auth.getClient();
-                            const drive = googleapis_1.google.drive({ version: 'v3', auth: authClient });
-                            for (const email of Array.from(new Set(emails))) {
-                                try {
-                                    await drive.permissions.create({
-                                        fileId: spreadsheetId,
-                                        requestBody: { role: 'writer', type: 'user', emailAddress: email },
-                                        fields: 'id',
-                                        sendNotificationEmail: false,
-                                    });
-                                }
-                                catch (err) {
-                                    console.error(`Failed to grant access to ${email}:`, err?.message || err);
-                                }
-                            }
-                        }
-                        catch (err) {
-                            console.error('Failed to restore sheet permissions:', err?.message || err);
-                        }
-                    }
-                }
-            }
-        }
-        catch (err) {
-            console.error('Error while restoring sheet access on reject:', err?.message || err);
-        }
-        res.json({
+        return res.json({
             success: true,
             message: "Project rejected successfully.",
         });
     }
     catch (error) {
         console.error("Error rejecting project:", error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error while rejecting project.",
         });
