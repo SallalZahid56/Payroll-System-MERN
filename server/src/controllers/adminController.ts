@@ -2888,70 +2888,26 @@ export const rejectProject = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Reset project status
+    // ✅ Reset project status and clear assignment
     project.status = "pending";
+    project.assigned_to = "";
+    project.assigned_to_ids = "";
+
     await project.save();
 
-    // Restore editor access on Google Sheet for assigned users (if sheet exists)
-    try {
-      const assignedIdsRaw: string = (project.assigned_to_ids || "") as any;
-      const assignedIds = assignedIdsRaw
-        ? assignedIdsRaw.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean)
-        : [];
-
-      if (assignedIds.length && project.google_sheet_url) {
-        const users = await User.find({ _id: { $in: assignedIds } }, "email");
-        const emails = (users as any[]).map(u => u.email).filter(Boolean);
-
-        if (emails.length) {
-          // extract spreadsheetId
-          let spreadsheetId: string | null = null;
-          try {
-            spreadsheetId = project.google_sheet_url.split('/d/')[1].split('/')[0];
-          } catch (e) {
-            spreadsheetId = null;
-          }
-
-          if (spreadsheetId) {
-            try {
-              const auth = getAuthClient();
-              const authClient = await auth.getClient();
-              const drive = google.drive({ version: 'v3', auth: authClient });
-
-              for (const email of Array.from(new Set(emails))) {
-                try {
-                  await drive.permissions.create({
-                    fileId: spreadsheetId,
-                    requestBody: { role: 'writer', type: 'user', emailAddress: email },
-                    fields: 'id',
-                    sendNotificationEmail: false,
-                  });
-                } catch (err: any) {
-                  console.error(`Failed to grant access to ${email}:`, err?.message || err);
-                }
-              }
-            } catch (err: any) {
-              console.error('Failed to restore sheet permissions:', err?.message || err);
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error('Error while restoring sheet access on reject:', err?.message || err);
-    }
-
-    res.json({
+    return res.json({
       success: true,
       message: "Project rejected successfully.",
     });
   } catch (error) {
     console.error("Error rejecting project:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error while rejecting project.",
     });
   }
 };
+
 
 // Update a payroll entry (project + worker salary row)
 export const updatePayrollEntry = async (req: Request, res: Response) => {
