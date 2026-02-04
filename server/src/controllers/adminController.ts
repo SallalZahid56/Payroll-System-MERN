@@ -379,6 +379,44 @@ export const addHourlyProject = async (req: Request, res: Response) => {
 };
 
 
+/* -------------------- 🔹 Save Hourly Calculation -------------------- */
+export const saveHourlyCalculation = async (req: Request, res: Response) => {
+  try {
+    const { projectId, salaries } = req.body;
+
+    if (!projectId || !salaries || !Array.isArray(salaries)) {
+      return res.status(400).json({ success: false, message: "Invalid data" });
+    }
+    
+    let pid = String(projectId);
+
+    // If looks like an ObjectId, try to resolve to the project's external id
+    if (mongoose.Types.ObjectId.isValid(pid)) {
+      const proj = await Project.findById(pid).select("project_id").lean();
+      if (proj && proj.project_id) pid = proj.project_id;
+    }
+
+    const totalProfileDebit = salaries.reduce((sum: number, s: any) => sum + Number(s.salary || 0), 0);
+
+    const docs = salaries.map((s: any) => ({
+      worker_name: s.worker,
+      project_id: pid,
+      salary: Number(s.salary || 0),
+      profile_debit: totalProfileDebit,
+      runned_hours: Number(s.runnedHours || 0),
+      created_at: new Date(),
+    }));
+
+    await db.collection("hourlyprojectrecords").insertMany(docs);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error saving hourly data:", error);
+    res.status(500).json({ success: false, message: "Failed to save data" });
+  }
+};
+
+
 
 /* -------------------- 🔹 Get All Unassigned Projects -------------------- */
 export const getUnassignedProjects = async (_req: Request, res: Response) => {
@@ -448,14 +486,14 @@ export const assignProject = async (req: Request, res: Response) => {
     const userIds: string[] = Array.isArray(assignedUsers)
       ? assignedUsers
       : assignedUsers
-      ? [assignedUsers]
-      : [];
+        ? [assignedUsers]
+        : [];
 
     const coordinatorIds: string[] = Array.isArray(assignedCoordinators)
       ? assignedCoordinators
       : assignedCoordinators
-      ? [assignedCoordinators]
-      : [];
+        ? [assignedCoordinators]
+        : [];
 
     // Fetch current project to determine removed users & sheet URL
     const project = await Project.findById(projectId).select("assigned_to_ids google_sheet_url");
@@ -2292,75 +2330,61 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
     ]).toArray();
 
     /* ================= HOURLY PROJECTS ================= */
-    const hourly = await HourlyRecords.aggregate([
-      {
-        $lookup: {
-          from: "projects",
-          localField: "project_id",
-          foreignField: "project_id",
-          as: "p",
-        },
-      },
-      { $unwind: "$p" },
-
+    /* ================= HOURLY (NOW WORKS) ================= */
+    const hourly = await Projects.aggregate([
       {
         $match: {
-          "p.company": company,
-          "p.status": "completed",
-          "p.updated_at": { $gte: start, $lte: end },
+          company,
+          status: "completed",
+          updated_at: { $gte: start, $lte: end },
         },
       },
-
       {
-        $addFields: {
-          hours_num: {
-            $convert: {
-              input: "$runned_hours",
-              to: "double",
-              onError: 0,
-              onNull: 0,
-            },
-          },
-          debit_num: {
-            $convert: {
-              input: "$salary",
-              to: "double",
-              onError: 0,
-              onNull: 0,
-            },
-          },
+        $lookup: {
+          from: "hourlyprojectrecords",
+          localField: "project_id",     // ✅ plain id
+          foreignField: "project_id",   // ✅ plain id
+          as: "hr",
         },
       },
-
+      { $unwind: "$hr" },
       {
         $project: {
-          project_id: "$project_id",
-          project_name: "$p.project_name",
-          profile_name: "$p.profile_name",
-          sheet_name: "$p.sheet_name",
-          price_per_entry: "$p.price_per_hour",
-          worker_entries: "$hours_num",
-          profile_debit: "$debit_num",
-          company: "$p.company",
+          _id: 0,
+          project_id: 1,
+          project_name: 1,
+          profile_name: 1,
+          sheet_name: 1,
+          price_per_entry: "$price_per_hour",
+          worker_entries: "$hr.runned_hours",
+          profile_debit: "$hr.salary",
+          company: 1,
         },
       },
     ]).toArray();
 
-    const allData = [...fixed, ...hourly];
-
-    const totals = allData.reduce(
-      (acc, i: any) => {
-        acc.grand += i.profile_debit || 0;
-        return acc;
-      },
-      { grand: 0 }
+    /* ================= TOTALS ================= */
+    const fixedSum = fixed.reduce(
+      (sum, i: any) => sum + (i.profile_debit || 0),
+      0
     );
+
+    const hourlySum = hourly.reduce(
+      (sum, i: any) => sum + (i.profile_debit || 0),
+      0
+    );
+
+    const grandSum = fixedSum + hourlySum;
+
+    const combinedData = [...fixed, ...hourly];
 
     res.json({
       success: true,
-      data: allData,
+      data: combinedData,
       totals: {
-        grand: totals.grand.toFixed(2),
+        fixed: fixedSum.toFixed(2),
+        hourly: hourlySum.toFixed(2),
+        grand: grandSum.toFixed(2),
       },
     });
   } catch (err) {
@@ -3209,5 +3233,32 @@ export const getPayrollFzBwp = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("FZ BWP payroll error:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+/* -------------------- 🔹 Mark Project Completed -------------------- */
+export const markProjectCompleted = async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: "Project ID is required" });
+    }
+
+    const project = await Project.findOneAndUpdate(
+      { project_id: projectId },
+      { status: "completed", original_completed_at: new Date() },
+      { new: true }
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error marking project as completed:", error);
+    res.status(500).json({ success: false, message: "Failed to mark project as completed" });
   }
 };

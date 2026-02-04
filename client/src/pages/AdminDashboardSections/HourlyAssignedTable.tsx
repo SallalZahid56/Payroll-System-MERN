@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import axios from "../../utils/axios";
 import AssignProjectModal from "../../components/AssignProjectModal";
+import HourlyCalculationModal from "../../components/HourlyCalculationModal";
 
 interface HourlyProject {
   _id: string;
@@ -31,6 +32,11 @@ export default function HourlyAssignedTable() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedAssignedUser, setSelectedAssignedUser] = useState<string | null>(null);
+  // Hourly calculation modal states
+  const [calcModalOpen, setCalcModalOpen] = useState(false);
+  const [calcProjectId, setCalcProjectId] = useState<string | null>(null);
+  const [calcAssignedTo, setCalcAssignedTo] = useState<string | null>(null);
+  const [calcPricePerHour, setCalcPricePerHour] = useState<number | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -153,6 +159,36 @@ export default function HourlyAssignedTable() {
     setAssignModalOpen(true);
   };
 
+  // Open hourly calculation modal
+  const handleHourlyCalculation = (projectId: string) => {
+    const project = projects.find((x) => x.project_id === projectId || x._id === projectId);
+    if (!project) return;
+    // send external project identifier (e.g. PROJ-408) to the modal/server
+    setCalcProjectId(project.project_id);
+    setCalcAssignedTo(project.assigned_to || "");
+    setCalcPricePerHour(project.price_per_hour || 0);
+    setCalcModalOpen(true);
+  };
+
+  // Placeholder for marking a project as complete — functionality to be added later
+  const handleMarkAsComplete = async (projectId: string) => {
+    const ok = window.confirm("Mark this project as complete?");
+    if (!ok) return;
+
+    try {
+      const res = await axios.post("/admin/mark-project-completed", { projectId });
+      if (res.data?.success) {
+        alert("Project marked as completed!");
+        fetchProjects();
+      } else {
+        alert("Failed to mark project as completed: " + (res.data?.message || ""));
+      }
+    } catch (err) {
+      console.error("Error marking project completed:", err);
+      alert("Error marking project as completed");
+    }
+  };
+
 
   if (loading) return <p>Loading hourly assigned projects...</p>;
   if (projects.length === 0) return <p>No hourly assigned projects found.</p>;
@@ -175,6 +211,8 @@ export default function HourlyAssignedTable() {
             <th className="p-2 border">Edit</th>
             <th className="p-2 border">Go to Project</th>
             <th className="p-2 border">Reassign</th>
+            <th className="p-2 border">Hourly Calc</th>
+            <th className="p-2 border">Mark Complete</th>
           </tr>
         </thead>
 
@@ -237,6 +275,26 @@ export default function HourlyAssignedTable() {
                   🔁 Reassign
                 </button>
               </td>
+
+              {/* Hourly Calculation column */}
+              <td className="p-2 border text-center">
+                <button
+                  onClick={() => handleHourlyCalculation(p.project_id)}
+                  className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-xs"
+                >
+                  ⚙️ Calc
+                </button>
+              </td>
+
+              {/* Mark as Complete column */}
+              <td className="p-2 border text-center">
+                <button
+                  onClick={() => handleMarkAsComplete(p.project_id)}
+                  className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                >
+                  ✅ Complete
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -249,6 +307,15 @@ export default function HourlyAssignedTable() {
         onClose={() => setAssignModalOpen(false)}
         onAssigned={fetchProjects}
         currentAssignedUsers={selectedAssignedUser ? [selectedAssignedUser] : []}
+      />
+
+      <HourlyCalculationModal
+        open={calcModalOpen}
+        projectId={calcProjectId}
+        assignedTo={calcAssignedTo}
+        pricePerHour={calcPricePerHour}
+        onClose={() => setCalcModalOpen(false)}
+        onSaved={() => fetchProjects()}
       />
     </div>
   );

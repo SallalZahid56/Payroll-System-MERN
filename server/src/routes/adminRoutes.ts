@@ -45,7 +45,9 @@ import {
   approveSingleEntryProject,
   approveMultiEntryProject,
   approveLumpsumProject,
-  rejectProject
+  rejectProject,
+  saveHourlyCalculation,
+  markProjectCompleted
 } from "../controllers/adminController";
 
 const router = express.Router();
@@ -100,6 +102,8 @@ router.post("/approve-single-entry", approveSingleEntryProject);
 router.post("/approve-multi-entry", approveMultiEntryProject);
 router.post("/approve-lumpsum", approveLumpsumProject);
 router.post("/reject-project", rejectProject);
+router.post("/save-hourly-calculation", saveHourlyCalculation);
+router.post("/mark-project-completed", markProjectCompleted);
 
 
 

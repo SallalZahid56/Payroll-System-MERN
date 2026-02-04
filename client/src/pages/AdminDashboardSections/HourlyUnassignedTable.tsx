@@ -154,6 +154,18 @@ export default function HourlyUnassignedTable() {
     setAssignModalOpen(true);
   };
 
+  // Placeholder for hourly calculation — to implement later
+  const handleHourlyCalculation = (projectId: string) => {
+    alert(`Hourly calculation clicked for ${projectId} (not implemented yet)`);
+  };
+
+  // Placeholder for marking a project as complete — to implement later
+  const handleMarkAsComplete = (projectId: string) => {
+    const ok = window.confirm("Mark this project as complete?");
+    if (!ok) return;
+    alert(`Mark as complete clicked for ${projectId} (not implemented yet)`);
+  };
+
   if (loading) return <p>Loading hourly unassigned projects...</p>;
   if (projects.length === 0) return <p>No hourly unassigned projects found.</p>;
 
@@ -173,6 +185,8 @@ export default function HourlyUnassignedTable() {
             <th className="p-2 border">Project Type</th>
             <th className="p-2 border">Price Per Hour</th>
             <th className="p-2 border">Shift</th>
+            <th className="p-2 border">Hourly Calc</th>
+            <th className="p-2 border">Mark Complete</th>
             <th className="p-2 border">Go to Project</th>
             <th className="p-2 border">Actions</th>
           </tr>
@@ -188,6 +202,26 @@ export default function HourlyUnassignedTable() {
               <td className="p-2 border">{renderCell(p, "project_type")}</td>
               <td className="p-2 border">{renderCell(p, "price_per_hour")}</td>
               <td className="p-2 border">{p.shift}</td>
+
+              {/* Hourly Calculation column */}
+              <td className="p-2 border text-center">
+                <button
+                  onClick={() => handleHourlyCalculation(p.project_id)}
+                  className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-xs"
+                >
+                  ⚙️ Calc
+                </button>
+              </td>
+
+              {/* Mark as Complete column */}
+              <td className="p-2 border text-center">
+                <button
+                  onClick={() => handleMarkAsComplete(p.project_id)}
+                  className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                >
+                  ✅ Complete
+                </button>
+              </td>
 
            {/* Go to Project column */}
               <td className="p-2 border text-center">
