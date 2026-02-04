@@ -56,4 +56,6 @@ router.post("/approve-single-entry", adminController_1.approveSingleEntryProject
 router.post("/approve-multi-entry", adminController_1.approveMultiEntryProject);
 router.post("/approve-lumpsum", adminController_1.approveLumpsumProject);
 router.post("/reject-project", adminController_1.rejectProject);
+router.post("/save-hourly-calculation", adminController_1.saveHourlyCalculation);
+router.post("/mark-project-completed", adminController_1.markProjectCompleted);
 exports.default = router;

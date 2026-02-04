@@ -3,7 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPayrollFzBwp = exports.getPayrollInfonavBwp = exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.getPayrollInfonavBwp = exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.markProjectCompleted = exports.getPayrollFzBwp = void 0;
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -329,6 +330,38 @@ const addHourlyProject = async (req, res) => {
     }
 };
 exports.addHourlyProject = addHourlyProject;
+/* -------------------- 🔹 Save Hourly Calculation -------------------- */
+const saveHourlyCalculation = async (req, res) => {
+    try {
+        const { projectId, salaries } = req.body;
+        if (!projectId || !salaries || !Array.isArray(salaries)) {
+            return res.status(400).json({ success: false, message: "Invalid data" });
+        }
+        let pid = String(projectId);
+        // If looks like an ObjectId, try to resolve to the project's external id
+        if (mongoose_1.default.Types.ObjectId.isValid(pid)) {
+            const proj = await Project_1.default.findById(pid).select("project_id").lean();
+            if (proj && proj.project_id)
+                pid = proj.project_id;
+        }
+        const totalProfileDebit = salaries.reduce((sum, s) => sum + Number(s.salary || 0), 0);
+        const docs = salaries.map((s) => ({
+            worker_name: s.worker,
+            project_id: pid,
+            salary: Number(s.salary || 0),
+            profile_debit: totalProfileDebit,
+            runned_hours: Number(s.runnedHours || 0),
+            created_at: new Date(),
+        }));
+        await db.collection("hourlyprojectrecords").insertMany(docs);
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error("Error saving hourly data:", error);
+        res.status(500).json({ success: false, message: "Failed to save data" });
+    }
+};
+exports.saveHourlyCalculation = saveHourlyCalculation;
 /* -------------------- 🔹 Get All Unassigned Projects -------------------- */
 const getUnassignedProjects = async (_req, res) => {
     try {
@@ -2016,66 +2049,50 @@ const getCompanyPayroll = async (req, res) => {
             },
         ]).toArray();
         /* ================= HOURLY PROJECTS ================= */
-        const hourly = await HourlyRecords.aggregate([
-            {
-                $lookup: {
-                    from: "projects",
-                    localField: "project_id",
-                    foreignField: "project_id",
-                    as: "p",
-                },
-            },
-            { $unwind: "$p" },
+        /* ================= HOURLY (NOW WORKS) ================= */
+        const hourly = await Projects.aggregate([
             {
                 $match: {
-                    "p.company": company,
-                    "p.status": "completed",
-                    "p.updated_at": { $gte: start, $lte: end },
+                    company,
+                    status: "completed",
+                    updated_at: { $gte: start, $lte: end },
                 },
             },
             {
-                $addFields: {
-                    hours_num: {
-                        $convert: {
-                            input: "$runned_hours",
-                            to: "double",
-                            onError: 0,
-                            onNull: 0,
-                        },
-                    },
-                    debit_num: {
-                        $convert: {
-                            input: "$salary",
-                            to: "double",
-                            onError: 0,
-                            onNull: 0,
-                        },
-                    },
+                $lookup: {
+                    from: "hourlyprojectrecords",
+                    localField: "project_id", // ✅ plain id
+                    foreignField: "project_id", // ✅ plain id
+                    as: "hr",
                 },
             },
+            { $unwind: "$hr" },
             {
                 $project: {
-                    project_id: "$project_id",
-                    project_name: "$p.project_name",
-                    profile_name: "$p.profile_name",
-                    sheet_name: "$p.sheet_name",
-                    price_per_entry: "$p.price_per_hour",
-                    worker_entries: "$hours_num",
-                    profile_debit: "$debit_num",
-                    company: "$p.company",
+                    _id: 0,
+                    project_id: 1,
+                    project_name: 1,
+                    profile_name: 1,
+                    sheet_name: 1,
+                    price_per_entry: "$price_per_hour",
+                    worker_entries: "$hr.runned_hours",
+                    profile_debit: "$hr.salary",
+                    company: 1,
                 },
             },
         ]).toArray();
-        const allData = [...fixed, ...hourly];
-        const totals = allData.reduce((acc, i) => {
-            acc.grand += i.profile_debit || 0;
-            return acc;
-        }, { grand: 0 });
+        /* ================= TOTALS ================= */
+        const fixedSum = fixed.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
+        const hourlySum = hourly.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
+        const grandSum = fixedSum + hourlySum;
+        const combinedData = [...fixed, ...hourly];
         res.json({
             success: true,
-            data: allData,
+            data: combinedData,
             totals: {
-                grand: totals.grand.toFixed(2),
+                fixed: fixedSum.toFixed(2),
+                hourly: hourlySum.toFixed(2),
+                grand: grandSum.toFixed(2),
             },
         });
     }
@@ -2805,3 +2822,22 @@ const getPayrollFzBwp = async (req, res) => {
     }
 };
 exports.getPayrollFzBwp = getPayrollFzBwp;
+/* -------------------- 🔹 Mark Project Completed -------------------- */
+const markProjectCompleted = async (req, res) => {
+    try {
+        const { projectId } = req.body;
+        if (!projectId) {
+            return res.status(400).json({ success: false, message: "Project ID is required" });
+        }
+        const project = await Project_1.default.findOneAndUpdate({ project_id: projectId }, { status: "completed", original_completed_at: new Date() }, { new: true });
+        if (!project) {
+            return res.status(404).json({ success: false, message: "Project not found" });
+        }
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error("Error marking project as completed:", error);
+        res.status(500).json({ success: false, message: "Failed to mark project as completed" });
+    }
+};
+exports.markProjectCompleted = markProjectCompleted;
