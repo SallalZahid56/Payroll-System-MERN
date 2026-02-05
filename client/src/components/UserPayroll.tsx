@@ -7,6 +7,7 @@ type PayrollApiRow = {
   project_name: string;
   user_name?: string;
   profile_name?: string;
+  price_worker_one?: number | string;
   salary?: number;
   no_of_entries?: number;
   revised_salary?: number;
@@ -74,6 +75,7 @@ export default function UserPayroll() {
         "Project Name",
         "Worker Name",
         "Profile Name",
+        "Price Per Entry",
         "Salary",
         "Entries",
         "Revised Salary",
@@ -86,6 +88,7 @@ export default function UserPayroll() {
         r.project_name || "",
         r.user_name || "",
         r.profile_name || "",
+        (Number(r.price_worker_one ?? 0)).toFixed(2),
         (Number(r.salary) || 0).toFixed(2),
         String(r.no_of_entries || ""),
         (Number(r.revised_salary) || 0).toFixed(2),
@@ -96,7 +99,7 @@ export default function UserPayroll() {
       // add totals row
       const totalSalary = payrollResults.reduce((acc, row) => acc + Number(row.salary || 0), 0);
       const totalEntries = payrollResults.reduce((acc, row) => acc + Number(row.no_of_entries || 0), 0);
-      body.push(["", "", "", "Total", totalSalary.toFixed(2), String(totalEntries), "", "", ""]);
+      body.push(["", "", "", "Total", "", totalSalary.toFixed(2), String(totalEntries), "", "", ""]);
 
       ;(doc as unknown as { autoTable: (opts: { head: unknown; body: unknown; startY?: number; styles?: unknown; headStyles?: unknown }) => void })
         .autoTable({
@@ -186,6 +189,7 @@ export default function UserPayroll() {
                   "Project Name",
                   "Worker Name",
                   "Profile Name",
+                  "Price Per Entry",
                   "Salary",
                   "Entries",
                   "Revised Salary",
@@ -205,6 +209,7 @@ export default function UserPayroll() {
                   <td className="px-4 py-2">{row.project_name}</td>
                   <td className="px-4 py-2">{row.user_name ?? "-"}</td>
                   <td className="px-4 py-2">{row.profile_name ?? "-"}</td>
+                  <td className="px-4 py-2">{typeof row.price_worker_one === "number" ? row.price_worker_one.toFixed(2) : row.price_worker_one ?? "-"}</td>
                   <td className="px-4 py-2">{row.salary?.toFixed?.(2) ?? row.salary}</td>
                   <td className="px-4 py-2">{row.no_of_entries}</td>
                   <td className="px-4 py-2">{row.revised_salary?.toFixed?.(2) ?? row.revised_salary}</td>
@@ -214,6 +219,7 @@ export default function UserPayroll() {
               ))}
               <tr className="bg-purple-50 font-semibold">
                 <td className="px-4 py-2" colSpan={4}>Total</td>
+                <td className="px-4 py-2"></td>
                 <td className="px-4 py-2">{totalSalary.toFixed(2)}</td>
                 <td className="px-4 py-2">{totalEntries}</td>
                 <td className="px-4 py-2" colSpan={3}></td>
