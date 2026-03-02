@@ -2041,7 +2041,13 @@ const getCompanyPayroll = async (req, res) => {
                     profile_name: { $first: "$profile_name" },
                     sheet_name: { $first: "$sheet_name" },
                     fixed_option: { $first: "$fixed_option" },
-                    price_per_entry: { $first: "$price_worker_one" },
+                    // Collect all price fields
+                    price_worker_one: { $first: "$price_worker_one" },
+                    price_worker_two: { $first: "$price_worker_two" },
+                    price_worker_three: { $first: "$price_worker_three" },
+                    price_worker_four: { $first: "$price_worker_four" },
+                    price_worker_five: { $first: "$price_worker_five" },
+                    lumpsum_price: { $first: "$lumpsum_price" },
                     worker_entries: { $sum: "$entries_num" },
                     profile_debit: { $max: "$debit_num" },
                     company: { $first: "$company" },
@@ -2081,6 +2087,26 @@ const getCompanyPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+        const fixedWithPrices = fixed.map((item) => {
+            const option = item.fixed_option || "";
+            let prices = [item.price_worker_one];
+            if (option === "Double Entry") {
+                prices = [item.price_worker_one, item.price_worker_two];
+            }
+            else if (option === "Triple Entry") {
+                prices = [item.price_worker_one, item.price_worker_two, item.price_worker_three];
+            }
+            else if (option === "Fourth Entry") {
+                prices = [item.price_worker_one, item.price_worker_two, item.price_worker_three, item.price_worker_four];
+            }
+            else if (option === "Fifth Entry") {
+                prices = [item.price_worker_one, item.price_worker_two, item.price_worker_three, item.price_worker_four, item.price_worker_five];
+            }
+            return {
+                ...item,
+                price_per_entry: prices.filter(Boolean).join(", "), // ✅ "10, 15, 20"
+            };
+        });
         /* ================= TOTALS ================= */
         const fixedSum = fixed.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const hourlySum = hourly.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
