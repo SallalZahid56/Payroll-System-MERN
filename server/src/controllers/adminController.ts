@@ -2391,7 +2391,7 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
       };
     });
 
-    
+
 
     /* ================= TOTALS ================= */
     const fixedSum = fixed.reduce(
@@ -2756,7 +2756,7 @@ export const approveMultiEntryProject = async (
     const entryCountMap: Record<string, number> = {
       "Double Entry": 2,
       "Triple Entry": 3,
-      "Four Entry": 4,
+      "Fourth Entry": 4,
       "Fifth Entry": 5,
     };
 
@@ -2783,7 +2783,7 @@ export const approveMultiEntryProject = async (
     const salaries: Record<string, number> = {};
     const entryCounts: Record<string, number> = {};
 
-    // 🔥 Recalculate salaries from scratch
+    //  Recalculate salaries from scratch
     projectData.row_data.forEach((row: any[]) => {
       for (let i = 0; i < numEntries; i++) {
         const rawName = row[row.length - numEntries + i];
@@ -2793,7 +2793,9 @@ export const approveMultiEntryProject = async (
         const realUser = userMap[normalized];
         if (!realUser) continue;
 
-        const price = priceMap[i] ?? 0;
+        // Worker One (i=0) × price_worker_one, Worker Two (i=1) × price_worker_two, etc.
+        const price = priceMap[i];  // priceMap[0] = price_worker_one, priceMap[1] = price_worker_two...
+
         salaries[realUser] = (salaries[realUser] || 0) + price;
         entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
       }
