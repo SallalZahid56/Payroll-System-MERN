@@ -6,7 +6,13 @@ type CompanyPayrollRow = {
   project_name: string;
   profile_name: string;
   sheet_name: string;
-  price_per_entry: number;
+  price_per_entry?: string | number;       // hourly
+  price_worker_one?: number | null;        // ✅ add these
+  price_worker_two?: number | null;
+  price_worker_three?: number | null;
+  price_worker_four?: number | null;
+  price_worker_five?: number | null;
+  lumpsum_price?: number | null;
   worker_entries: number;
   profile_debit: number;
   company: string;
@@ -74,6 +80,26 @@ export default function CompanyPayroll() {
     (sum, r) => sum + r.profile_debit,
     0
   );
+
+  const getPriceDisplay = (r: CompanyPayrollRow): string => {
+    // Hourly projects already have price_per_entry
+    if (!r.fixed_option) return r.price_per_entry?.toString() ?? "—";
+
+    const option = r.fixed_option;
+
+    if (option === "Lumpsum") return r.lumpsum_price?.toString() ?? "—";
+
+    const priceMap: Record<string, (number | null | undefined)[]> = {
+      "Single Entry": [r.price_worker_one],
+      "Double Entry": [r.price_worker_one, r.price_worker_two],
+      "Triple Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three],
+      "Fourth Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three, r.price_worker_four],
+      "Fifth Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three, r.price_worker_four, r.price_worker_five],
+    };
+
+    const prices = priceMap[option] ?? [r.price_worker_one];
+    return prices.filter((p) => p !== null && p !== undefined && p !== 0).join(", ") || "—";
+  };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
@@ -159,7 +185,7 @@ export default function CompanyPayroll() {
                 <td className="px-4 py-2 font-semibold text-purple-700">
                   {r.fixed_option ?? "—"}
                 </td>
-                <td className="px-4 py-2">{r.price_per_entry}</td>
+                <td className="px-4 py-2">{getPriceDisplay(r)}</td>
                 <td className="px-4 py-2">{r.worker_entries}</td>
                 <td className="px-4 py-2 font-semibold">
                   {r.profile_debit.toFixed(2)}
