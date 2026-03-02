@@ -2410,7 +2410,7 @@ const approveMultiEntryProject = async (req, res) => {
         const entryCountMap = {
             "Double Entry": 2,
             "Triple Entry": 3,
-            "Four Entry": 4,
+            "Fourth Entry": 4,
             "Fifth Entry": 5,
         };
         const numEntries = entryCountMap[project.fixed_option ?? ""];
@@ -2432,7 +2432,7 @@ const approveMultiEntryProject = async (req, res) => {
         });
         const salaries = {};
         const entryCounts = {};
-        // 🔥 Recalculate salaries from scratch
+        //  Recalculate salaries from scratch
         projectData.row_data.forEach((row) => {
             for (let i = 0; i < numEntries; i++) {
                 const rawName = row[row.length - numEntries + i];
@@ -2442,7 +2442,8 @@ const approveMultiEntryProject = async (req, res) => {
                 const realUser = userMap[normalized];
                 if (!realUser)
                     continue;
-                const price = priceMap[i] ?? 0;
+                // Worker One (i=0) × price_worker_one, Worker Two (i=1) × price_worker_two, etc.
+                const price = priceMap[i]; // priceMap[0] = price_worker_one, priceMap[1] = price_worker_two...
                 salaries[realUser] = (salaries[realUser] || 0) + price;
                 entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
             }
