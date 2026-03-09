@@ -2746,6 +2746,7 @@ export const approveMultiEntryProject = async (
   try {
     const { projectId } = req.body;
 
+    // Fetch project and project data
     const project = await Project.findOne({ project_id: projectId });
     const projectData = await ProjectData.findOne({ project_id: projectId }) as any;
 
@@ -2753,6 +2754,7 @@ export const approveMultiEntryProject = async (
       return res.status(404).json({ success: false, message: "Project not found" });
     }
 
+    // Determine number of entries based on project option
     const entryCountMap: Record<string, number> = {
       "Double Entry": 2,
       "Triple Entry": 3,
@@ -2765,6 +2767,7 @@ export const approveMultiEntryProject = async (
       return res.status(400).json({ success: false, message: "Invalid multi-entry option" });
     }
 
+    // Map worker column index → price
     const priceMap = [
       project.price_worker_one ?? 0,
       project.price_worker_two ?? 0,
@@ -2773,40 +2776,51 @@ export const approveMultiEntryProject = async (
       project.price_worker_five ?? 0,
     ];
 
-    // Load users
+    // Load users and create normalized map
     const users = await User.find({}, { name: 1 });
     const userMap: Record<string, string> = {};
     users.forEach(u => {
       userMap[normalizeName(u.name)] = u.name;
     });
 
+    // Initialize salary and entry counts
     const salaries: Record<string, number> = {};
     const entryCounts: Record<string, number> = {};
 
-    //  Recalculate salaries from scratch
-    projectData.row_data.forEach((row: any[]) => {
-      for (let i = 0; i < numEntries; i++) {
-        const rawName = row[row.length - numEntries + i];
-        if (!rawName) continue;
+    // Process each row safely
+    if (Array.isArray(projectData.row_data)) {
+      projectData.row_data.forEach((row: any[]) => {
+        if (!row || !Array.isArray(row)) return;
 
-        const normalized = normalizeName(rawName);
-        const realUser = userMap[normalized];
-        if (!realUser) continue;
+        // Compute start index for multi-entry columns
+        const startIndex = Math.max(0, row.length - numEntries);
 
-        // Worker One (i=0) × price_worker_one, Worker Two (i=1) × price_worker_two, etc.
-        const price = priceMap[i];  // priceMap[0] = price_worker_one, priceMap[1] = price_worker_two...
+        for (let i = 0; i < numEntries; i++) {
+          const colIndex = startIndex + i;
+          if (colIndex >= row.length) continue; // skip missing cells
 
-        salaries[realUser] = (salaries[realUser] || 0) + price;
-        entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
-      }
-    });
+          const rawName = row[colIndex];
+          if (!rawName) continue;
 
-    // profile debit remains as sum of calculated salaries (as before)
+          const normalized = normalizeName(rawName);
+          const realUser = userMap[normalized];
+          if (!realUser) continue;
+
+          const price = priceMap[i] ?? 0;
+
+          salaries[realUser] = (salaries[realUser] || 0) + price;
+          entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+        }
+      });
+    }
+
+    // Calculate total profile debit
     const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
 
     const WorkerSalaryCollection = db.collection("workersalaries");
     const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
 
+    // Update salaries in DB
     for (const worker of Object.keys(salaries)) {
       const salary = salaries[worker];
       const entries = entryCounts[worker];
@@ -2816,8 +2830,8 @@ export const approveMultiEntryProject = async (
         project_id: projectId,
       }) as any;
 
-      // Normal project → overwrite values
       if (!project.is_revised) {
+        // Normal project → overwrite
         await WorkerSalaryCollection.updateOne(
           { worker_name: worker, project_id: projectId },
           {
@@ -2853,7 +2867,7 @@ export const approveMultiEntryProject = async (
       }
     }
 
-    // ✅ Mark project as completed
+    // Mark project as completed
     await Project.updateOne({ project_id: projectId }, { status: "completed" });
 
     res.json({
