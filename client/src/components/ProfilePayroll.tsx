@@ -6,9 +6,16 @@ type PayrollRow = {
   project_id: string;
   project_name: string;
   profile_name?: string;
-  profile_debit?: number; 
+  profile_debit?: number;
   salary?: number;
   no_of_entries?: number;
+  fixed_option?: string;
+  price_worker_one?: number | null;
+  price_worker_two?: number | null;
+  price_worker_three?: number | null;
+  price_worker_four?: number | null;
+  price_worker_five?: number | null;
+  lumpsum_price?: number | null;
 };
 
 export default function ProfilePayroll() {
@@ -31,7 +38,7 @@ export default function ProfilePayroll() {
     fetchProfiles();
   }, []);
 
- const fetchProfilePayroll = async () => {
+  const fetchProfilePayroll = async () => {
     if (!selectedProfile) return alert("Please select a profile.");
     if (!startDate || !endDate) return alert("Please select both start and end dates.");
 
@@ -64,6 +71,27 @@ export default function ProfilePayroll() {
 
   const totalSalary = payrollResults.reduce((acc, row) => acc + Number(row.salary || 0), 0);
   const totalEntries = payrollResults.reduce((acc, row) => acc + Number(row.no_of_entries || 0), 0);
+
+  // 👇 ADD FUNCTION HERE
+  const getPriceDisplay = (r: PayrollRow): string => {
+    if (!r.fixed_option) return "—";
+
+    if (r.fixed_option === "Lumpsum") return r.lumpsum_price?.toString() ?? "—";
+
+    const priceMap: Record<string, (number | null | undefined)[]> = {
+      "Single Entry": [r.price_worker_one],
+      "Double Entry": [r.price_worker_one, r.price_worker_two],
+      "Triple Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three],
+      "Fourth Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three, r.price_worker_four],
+      "Fifth Entry": [r.price_worker_one, r.price_worker_two, r.price_worker_three, r.price_worker_four, r.price_worker_five],
+    };
+
+    const prices = priceMap[r.fixed_option] ?? [r.price_worker_one];
+
+    return prices
+      .filter((p) => p !== null && p !== undefined && p !== 0)
+      .join(", ") || "—";
+  };
 
   return (
     <div className="min-w-[800px] bg-white shadow-lg rounded-xl overflow-x-auto p-6">
@@ -120,7 +148,7 @@ export default function ProfilePayroll() {
           <table className="min-w-full divide-y divide-gray-200 rounded-xl">
             <thead className="bg-purple-100">
               <tr>
-                {["Project ID","Project Name","Profile Name","Salary","Entries"].map((h) => (
+                {["Project ID", "Project Name", "Profile Name", "price", "Salary", "Entries"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-purple-900 font-semibold uppercase">{h}</th>
                 ))}
               </tr>
@@ -131,6 +159,7 @@ export default function ProfilePayroll() {
                   <td className="px-4 py-2">{row.project_id}</td>
                   <td className="px-4 py-2">{row.project_name}</td>
                   <td className="px-4 py-2">{row.profile_name ?? "-"}</td>
+                  <td className="px-4 py-2">{getPriceDisplay(row)}</td>
                   <td className="px-4 py-2">{row.salary?.toFixed?.(2) ?? row.salary}</td>
                   <td className="px-4 py-2">{row.no_of_entries}</td>
                 </tr>
