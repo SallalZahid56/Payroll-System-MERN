@@ -1234,8 +1234,15 @@ const getProfilePayroll = async (req, res) => {
                     project_name: { $first: "$project_name" },
                     profile_name: { $first: "$profile_name" },
                     sheet_name: { $first: "$sheet_name" },
+                    fixed_option: { $first: "$fixed_option" },
                     price_worker_one: { $first: "$price_worker_one" },
-                    profile_debit: { $first: "$ws.profile_debit" }, // NO SUM
+                    price_worker_two: { $first: "$price_worker_two" },
+                    price_worker_three: { $first: "$price_worker_three" },
+                    price_worker_four: { $first: "$price_worker_four" },
+                    price_worker_five: { $first: "$price_worker_five" },
+                    lumpsum_price: { $first: "$lumpsum_price" },
+                    price_per_hour: { $first: "$price_per_hour" },
+                    profile_debit: { $first: "$ws.profile_debit" },
                     no_of_entries: { $sum: "$ws.no_of_entries" },
                     company: { $first: "$company" },
                     type: { $first: "Fixed" },
@@ -2041,7 +2048,6 @@ const getCompanyPayroll = async (req, res) => {
                     profile_name: { $first: "$profile_name" },
                     sheet_name: { $first: "$sheet_name" },
                     fixed_option: { $first: "$fixed_option" },
-                    // Collect all price fields
                     price_worker_one: { $first: "$price_worker_one" },
                     price_worker_two: { $first: "$price_worker_two" },
                     price_worker_three: { $first: "$price_worker_three" },
@@ -2089,8 +2095,14 @@ const getCompanyPayroll = async (req, res) => {
         ]).toArray();
         const fixedWithPrices = fixed.map((item) => {
             const option = item.fixed_option || "";
-            let prices = [item.price_worker_one];
-            if (option === "Double Entry") {
+            let prices = [];
+            if (option === "Lumpsum") {
+                prices = [item.lumpsum_price];
+            }
+            else if (option === "Single Entry") {
+                prices = [item.price_worker_one];
+            }
+            else if (option === "Double Entry") {
                 prices = [item.price_worker_one, item.price_worker_two];
             }
             else if (option === "Triple Entry") {
@@ -2104,7 +2116,7 @@ const getCompanyPayroll = async (req, res) => {
             }
             return {
                 ...item,
-                price_per_entry: prices.filter(Boolean).join(", "), // ✅ "10, 15, 20"
+                price_per_entry: prices.filter(Boolean).join(", "), // ✅ now lumpsum included
             };
         });
         /* ================= TOTALS ================= */
