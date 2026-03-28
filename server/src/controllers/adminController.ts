@@ -2798,30 +2798,67 @@ export const approveMultiEntryProject = async (
     const entryCounts: Record<string, number> = {};
 
     // Process each row safely
-    if (Array.isArray(projectData.row_data)) {
-      projectData.row_data.forEach((row: any[]) => {
-        if (!row || !Array.isArray(row)) return;
+    if (Array.isArray(projectData.row_data) && projectData.row_data.length > 0) {
+      const allRows = projectData.row_data as any[][];
 
-        // Compute start index for multi-entry columns
-        const startIndex = Math.max(0, row.length - numEntries);
+      // Try to detect worker columns from header (first row saved by sync)
+      const headerRow = Array.isArray(allRows[0]) ? allRows[0].map((h: any) => String(h || "")) : [];
+      const headerNormalized = headerRow.map((h: string) => h.trim().toLowerCase());
 
-        for (let i = 0; i < numEntries; i++) {
-          const colIndex = startIndex + i;
-          if (colIndex >= row.length) continue; // skip missing cells
+      const workerColumnNames = [
+        "Worker One",
+        "Worker Two",
+        "Worker Three",
+        "Worker Four",
+        "Worker Five",
+      ].slice(0, numEntries);
 
-          const rawName = row[colIndex];
-          if (!rawName) continue;
+      const workerIndices = workerColumnNames.map((w) => headerNormalized.indexOf((w || "").trim().toLowerCase()));
 
-          const normalized = normalizeName(rawName);
-          const realUser = userMap[normalized];
-          if (!realUser) continue;
+      const foundHeaderCols = workerIndices.some((idx) => idx >= 0);
 
-          const price = priceMap[i] ?? 0;
+      // If header columns found, use those indices; otherwise fall back to previous "last N columns" approach
+      if (foundHeaderCols) {
+        // iterate data rows (skip header)
+        for (let r = 1; r < allRows.length; r++) {
+          const row = allRows[r] || [];
+          for (let i = 0; i < workerIndices.length; i++) {
+            const colIndex = workerIndices[i];
+            if (colIndex < 0 || colIndex >= row.length) continue;
+            const rawCell = row[colIndex];
+            if (!rawCell) continue;
 
-          salaries[realUser] = (salaries[realUser] || 0) + price;
-          entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+            // allow comma-separated names in a cell
+            const names = String(rawCell).split(",").map(s => s.trim()).filter(Boolean);
+            for (const name of names) {
+              const normalized = normalizeName(name);
+              const realUser = userMap[normalized];
+              if (!realUser) continue;
+              const price = priceMap[i] ?? 0;
+              salaries[realUser] = (salaries[realUser] || 0) + price;
+              entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+            }
+          }
         }
-      });
+      } else {
+        // Fallback: use last `numEntries` columns of each row (legacy behavior)
+        allRows.forEach((row: any[]) => {
+          if (!row || !Array.isArray(row)) return;
+          const startIndex = Math.max(0, row.length - numEntries);
+          for (let i = 0; i < numEntries; i++) {
+            const colIndex = startIndex + i;
+            if (colIndex >= row.length) continue;
+            const rawName = row[colIndex];
+            if (!rawName) continue;
+            const normalized = normalizeName(rawName);
+            const realUser = userMap[normalized];
+            if (!realUser) continue;
+            const price = priceMap[i] ?? 0;
+            salaries[realUser] = (salaries[realUser] || 0) + price;
+            entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+          }
+        });
+      }
     }
 
     // Calculate total profile debit
