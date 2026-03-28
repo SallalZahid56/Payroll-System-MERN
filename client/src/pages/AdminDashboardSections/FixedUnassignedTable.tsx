@@ -28,6 +28,7 @@ interface Project {
 export default function FixedUnassignedTable() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterOption, setFilterOption] = useState("All");
 
   const [editRowId, setEditRowId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Project>>({});
@@ -38,6 +39,14 @@ export default function FixedUnassignedTable() {
   useEffect(() => {
     fetchUnassignedProjects();
   }, []);
+
+  const filteredProjects = projects.filter((p) => {
+    if (filterOption === "All") return true;
+    if (filterOption === "Single Entry") return p.fixed_option === "Single Entry";
+    if (filterOption === "Multi Entry") return ["Double Entry","Triple Entry","Fourth Entry","Fifth Entry"].includes(p.fixed_option || "");
+    if (filterOption === "Lumpsum") return p.fixed_option === "Lumpsum";
+    return true;
+  });
 
   const fetchUnassignedProjects = async () => {
     setLoading(true);
@@ -81,11 +90,6 @@ export default function FixedUnassignedTable() {
   };
 
   // ---------------- Assign Modal ----------------
-  const openAssignModal = (projectId: string) => {
-    setSelectedProjectId(projectId);
-    setShowAssignModal(true);
-  };
-
   const closeAssignModal = () => {
     setShowAssignModal(false);
     setSelectedProjectId(null);
@@ -174,6 +178,42 @@ export default function FixedUnassignedTable() {
         📋 Fixed Unassigned Projects
       </h2>
 
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div>
+          <select
+            value={filterOption}
+            onChange={(e) => setFilterOption(e.target.value)}
+            className="border rounded px-3 py-1 text-sm mr-2"
+          >
+            <option value="All">All</option>
+            <option value="Single Entry">Single Entry</option>
+            <option value="Multi Entry">Multi Entry</option>
+            <option value="Lumpsum">Lumpsum</option>
+          </select>
+          <button
+            onClick={() => { setFilterOption('All'); }}
+            className="px-3 py-1 bg-gray-200 rounded text-sm"
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowAssignModal(true); setSelectedProjectId(null); }}
+            className="px-3 py-1 bg-green-600 text-white rounded text-sm"
+          >
+            Assign All ({filteredProjects.length})
+          </button>
+          <button
+            onClick={fetchUnassignedProjects}
+            className="px-3 py-1 bg-gray-200 rounded text-sm"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
       {loading ? (
         <div className="text-center text-gray-500">Loading projects...</div>
       ) : projects.length === 0 ? (
@@ -213,7 +253,7 @@ export default function FixedUnassignedTable() {
           </thead>
 
           <tbody>
-            {projects.map((p) => (
+            {filteredProjects.map((p) => (
               <tr key={p._id} className="hover:bg-purple-50 border-b border-gray-200">
                 <td className="p-3 border-r">{renderCell(p, "project_id")}</td>
                 <td className="p-3 border-r">{renderCell(p, "project_name")}</td>
@@ -268,7 +308,7 @@ export default function FixedUnassignedTable() {
                 <td className="p-3 text-center">
                   <button
                     className="px-3 py-1 bg-purple-600 text-white rounded text-xs"
-                    onClick={() => openAssignModal(p._id)}
+                    onClick={() => { setSelectedProjectId(p._id); setShowAssignModal(true); }}
                   >
                     ➕ Assign
                   </button>
@@ -292,6 +332,7 @@ export default function FixedUnassignedTable() {
 
       <AssignProjectModal
         projectId={selectedProjectId}
+        projectIds={showAssignModal && !selectedProjectId ? filteredProjects.map(p => p._id) : undefined}
         open={showAssignModal}
         onClose={closeAssignModal}
         onAssigned={fetchUnassignedProjects}

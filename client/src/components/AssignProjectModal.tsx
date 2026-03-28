@@ -8,7 +8,8 @@ interface User {
 }
 
 interface Props {
-  projectId: string | null;
+  projectId?: string | null;
+  projectIds?: string[] | null; // when provided, assign to multiple projects
   open: boolean;
   onClose: () => void;
   onAssigned: () => void;
@@ -17,6 +18,7 @@ interface Props {
 
 export default function AssignProjectModal({
   projectId,
+  projectIds,
   open,
   onClose,
   onAssigned,
@@ -71,21 +73,23 @@ export default function AssignProjectModal({
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId) return;
+    const targets: string[] = projectIds && projectIds.length > 0 ? projectIds : projectId ? [projectId] : [];
+    if (targets.length === 0) return;
 
     try {
       setLoading(true);
 
-      // Send IDs only
-      await axios.post("/admin/assign-project", {
-        projectId,
-        assignedUsers: selectedUsers,
-      });
+      for (const pid of targets) {
+        await axios.post("/admin/assign-project", {
+          projectId: pid,
+          assignedUsers: selectedUsers,
+        });
+      }
 
       onAssigned();
       onClose();
     } catch (err) {
-      console.error("Error assigning project:", err);
+      console.error("Error assigning project(s):", err);
     } finally {
       setLoading(false);
     }
