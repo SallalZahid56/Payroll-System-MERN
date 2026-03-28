@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "../../utils/axios";
+import { AxiosError } from "axios";
 
 type ProjectListItem = { project_id: string; project_name: string };
 
@@ -35,6 +36,24 @@ type ApproveRequestBody = {
 };
 
 export default function ProjectExpenseTable() {
+  // Helper to safely extract an error message from unknown errors (including Axios errors)
+  const extractErrorMessage = (e: unknown, fallback = 'An error occurred') => {
+    if (!e) return fallback;
+    if (typeof e === 'string') return e;
+    if (e instanceof Error) return e.message;
+    const ax = e as AxiosError & { response?: unknown };
+    // response could be unknown; safely attempt to read nested message when available
+    const resp = ax?.response as unknown;
+    if (resp && typeof resp === 'object') {
+      const maybe = resp as Record<string, unknown>;
+      const data = maybe['data'] as unknown;
+      if (data && typeof data === 'object') {
+        const msg = (data as Record<string, unknown>)['message'];
+        if (typeof msg === 'string') return msg;
+      }
+    }
+    return ax?.message || fallback;
+  };
   const [projectList, setProjectList] = useState<ProjectListItem[]>([]);
   const [projects, setProjects] = useState<ExpenseRow[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -203,13 +222,13 @@ export default function ProjectExpenseTable() {
       }
 
       await axios.post(url, body);
-      alert('Recalculation finished ✅ (approval route executed)');
+      alert('Recalculation finished (approval route executed)');
 
       // refresh payroll data to show updated salaries
       await fetchPayrollByProjectId(currentProjectId);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error recalculating project payroll:', err);
-      const msg = err?.response?.data?.message || err?.message || 'Failed to recalculate ❌';
+      const msg = extractErrorMessage(err, 'Failed to recalculate ❌');
       alert(msg);
     } finally {
       setLoading(false);
@@ -283,9 +302,9 @@ export default function ProjectExpenseTable() {
           <button className="px-4 py-2 bg-purple-700 text-white rounded" onClick={handleFetch}>Search</button>
           <button className="px-4 py-2 bg-gray-300 rounded" onClick={() => { setSearchTerm(''); setProjects([]); setShowSuggestions(false); setSelectedSuggestion(null); setSuppressSuggestions(false); setCurrentProjectId(null); setCurrentProjectDetails(null); }}>Clear</button>
           <button
-            className={`px-4 py-2 rounded ${projects.length > 0 ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+            className={`px-4 py-2 rounded ${currentProjectId ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
             onClick={handleRecalculate}
-            disabled={projects.length === 0 || loading}
+            disabled={!currentProjectId || loading}
           >
             🔁 Recalculate
           </button>
@@ -355,9 +374,9 @@ export default function ProjectExpenseTable() {
                           setEditRow(null);
                           await fetchPayrollByProjectId(p.project_id);
                           alert('Row saved');
-                        } catch (err: any) {
+                        } catch (err: unknown) {
                           console.error('Failed to save row:', err);
-                          alert(err?.response?.data?.message || err?.message || 'Save failed');
+                          alert(extractErrorMessage(err, 'Save failed'));
                         }
                       }}>Save</button>
                       <button className="px-2 py-1 bg-gray-300 rounded" onClick={()=>{ setEditingIndex(null); setEditRow(null); }}>Cancel</button>
