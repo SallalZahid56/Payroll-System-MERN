@@ -30,11 +30,11 @@ const getUsers = async (req, res) => {
                 { role: { $regex: search, $options: "i" } },
             ],
         };
-        // Fetch users with pagination
+        // Fetch users with pagination — sort by `created_at` to preserve insertion order
         const users = await user_1.default.find(search ? searchFilter : {})
             .skip((pageNum - 1) * limitNum)
             .limit(limitNum)
-            .sort({ createdAt: -1 });
+            .sort({ created_at: 1 });
         // Count total users
         const totalUsers = await user_1.default.countDocuments(search ? searchFilter : {});
         res.json({
@@ -2449,28 +2449,69 @@ const approveMultiEntryProject = async (req, res) => {
         const salaries = {};
         const entryCounts = {};
         // Process each row safely
-        if (Array.isArray(projectData.row_data)) {
-            projectData.row_data.forEach((row) => {
-                if (!row || !Array.isArray(row))
-                    return;
-                // Compute start index for multi-entry columns
-                const startIndex = Math.max(0, row.length - numEntries);
-                for (let i = 0; i < numEntries; i++) {
-                    const colIndex = startIndex + i;
-                    if (colIndex >= row.length)
-                        continue; // skip missing cells
-                    const rawName = row[colIndex];
-                    if (!rawName)
-                        continue;
-                    const normalized = normalizeName(rawName);
-                    const realUser = userMap[normalized];
-                    if (!realUser)
-                        continue;
-                    const price = priceMap[i] ?? 0;
-                    salaries[realUser] = (salaries[realUser] || 0) + price;
-                    entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+        if (Array.isArray(projectData.row_data) && projectData.row_data.length > 0) {
+            const allRows = projectData.row_data;
+            // Try to detect worker columns from header (first row saved by sync)
+            const headerRow = Array.isArray(allRows[0]) ? allRows[0].map((h) => String(h || "")) : [];
+            const headerNormalized = headerRow.map((h) => h.trim().toLowerCase());
+            const workerColumnNames = [
+                "Worker One",
+                "Worker Two",
+                "Worker Three",
+                "Worker Four",
+                "Worker Five",
+            ].slice(0, numEntries);
+            const workerIndices = workerColumnNames.map((w) => headerNormalized.indexOf((w || "").trim().toLowerCase()));
+            const foundHeaderCols = workerIndices.some((idx) => idx >= 0);
+            // If header columns found, use those indices; otherwise fall back to previous "last N columns" approach
+            if (foundHeaderCols) {
+                // iterate data rows (skip header)
+                for (let r = 1; r < allRows.length; r++) {
+                    const row = allRows[r] || [];
+                    for (let i = 0; i < workerIndices.length; i++) {
+                        const colIndex = workerIndices[i];
+                        if (colIndex < 0 || colIndex >= row.length)
+                            continue;
+                        const rawCell = row[colIndex];
+                        if (!rawCell)
+                            continue;
+                        // allow comma-separated names in a cell
+                        const names = String(rawCell).split(",").map(s => s.trim()).filter(Boolean);
+                        for (const name of names) {
+                            const normalized = normalizeName(name);
+                            const realUser = userMap[normalized];
+                            if (!realUser)
+                                continue;
+                            const price = priceMap[i] ?? 0;
+                            salaries[realUser] = (salaries[realUser] || 0) + price;
+                            entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+                        }
+                    }
                 }
-            });
+            }
+            else {
+                // Fallback: use last `numEntries` columns of each row (legacy behavior)
+                allRows.forEach((row) => {
+                    if (!row || !Array.isArray(row))
+                        return;
+                    const startIndex = Math.max(0, row.length - numEntries);
+                    for (let i = 0; i < numEntries; i++) {
+                        const colIndex = startIndex + i;
+                        if (colIndex >= row.length)
+                            continue;
+                        const rawName = row[colIndex];
+                        if (!rawName)
+                            continue;
+                        const normalized = normalizeName(rawName);
+                        const realUser = userMap[normalized];
+                        if (!realUser)
+                            continue;
+                        const price = priceMap[i] ?? 0;
+                        salaries[realUser] = (salaries[realUser] || 0) + price;
+                        entryCounts[realUser] = (entryCounts[realUser] || 0) + 1;
+                    }
+                });
+            }
         }
         // Calculate total profile debit
         const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
