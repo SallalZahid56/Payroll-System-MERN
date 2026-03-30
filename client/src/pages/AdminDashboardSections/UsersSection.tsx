@@ -16,6 +16,8 @@ export default function UsersSection() {
     const limit = 10;
     const [totalUsers, setTotalUsers] = useState(0);
     const totalPages = Math.ceil(totalUsers / limit);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
 
     // Add User form states
     const [newName, setNewName] = useState("");
@@ -24,21 +26,35 @@ export default function UsersSection() {
     const [newRole, setNewRole] = useState("user");
     const [loading, setLoading] = useState(false);
 
-    const fetchUsers = useCallback(async () => {
+    const fetchUsers = useCallback(async (pageArg: number, search = "") => {
         try {
             const res = await axios.get(`/admin/users`, {
-                params: { page, limit },
+                params: { page: pageArg, limit, search },
             });
-            setUsers(res.data.users);
+            // Ensure no duplicate users returned
+            const uniq = Array.isArray(res.data.users)
+                ? res.data.users.filter((u: User, idx: number, arr: User[]) => arr.findIndex(x => x._id === u._id) === idx)
+                : [];
+            setUsers(uniq);
             setTotalUsers(res.data.totalUsers);
         } catch (err) {
             console.error("Error fetching users:", err);
         }
-    }, [page]);
+    }, []);
 
+    // Fetch when page or debounced search changes
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        fetchUsers(page, debouncedSearch);
+    }, [page, debouncedSearch, fetchUsers]);
+
+    // Debounce search input and reset to page 1
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setPage(1);
+            setDebouncedSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
 
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,7 +74,7 @@ export default function UsersSection() {
             setNewEmail("");
             setNewPassword("");
             setNewRole("user");
-            fetchUsers();
+                fetchUsers(page, debouncedSearch);
         } catch (err) {
             console.error(err);
             alert("Failed to add user");
@@ -70,7 +86,7 @@ export default function UsersSection() {
         if (!confirm("Are you sure you want to delete this user?")) return;
         try {
             await axios.delete(`/admin/users/${id}`);
-            fetchUsers();
+            fetchUsers(page, debouncedSearch);
         } catch (err) {
             console.error(err);
             alert("Failed to delete user");
@@ -93,7 +109,7 @@ export default function UsersSection() {
 
         try {
             await axios.put(`/admin/users/${id}`, { role: cleanRole });
-            fetchUsers();
+            fetchUsers(page, debouncedSearch);
         } catch (err) {
             console.error(err);
             alert("Failed to update role");
@@ -148,6 +164,17 @@ export default function UsersSection() {
                     {loading ? "Adding..." : <><FaPlus className="inline mr-2" /> Add User</>}
                 </button>
             </form>
+
+            {/* Search */}
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Search users by name, email or role"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="p-2 border rounded w-full md:w-1/3"
+                />
+            </div>
 
             {/* Users Table */}
             <div className="overflow-x-auto">

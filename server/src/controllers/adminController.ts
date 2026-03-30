@@ -41,11 +41,11 @@ export const getUsers = async (req: Request, res: Response) => {
       ],
     };
 
-    // Fetch users with pagination
+    // Fetch users with pagination — sort by `created_at` to preserve insertion order
     const users = await User.find(search ? searchFilter : {})
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum)
-      .sort({ createdAt: -1 });
+      .sort({ created_at: 1 });
 
     // Count total users
     const totalUsers = await User.countDocuments(search ? searchFilter : {});
