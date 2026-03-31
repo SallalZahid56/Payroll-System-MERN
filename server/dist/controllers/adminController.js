@@ -2073,8 +2073,8 @@ const getCompanyPayroll = async (req, res) => {
             {
                 $lookup: {
                     from: "hourlyprojectrecords",
-                    localField: "project_id", // ✅ plain id
-                    foreignField: "project_id", // ✅ plain id
+                    localField: "project_id", // plain id
+                    foreignField: "project_id", // plain id
                     as: "hr",
                 },
             },
@@ -2116,14 +2116,28 @@ const getCompanyPayroll = async (req, res) => {
             }
             return {
                 ...item,
-                price_per_entry: prices.filter(Boolean).join(", "), // ✅ now lumpsum included
+                price_per_entry: prices.filter(Boolean).join(", "), // now lumpsum included
             };
         });
         /* ================= TOTALS ================= */
         const fixedSum = fixed.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const hourlySum = hourly.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const grandSum = fixedSum + hourlySum;
-        const combinedData = [...fixed, ...hourly];
+        // Use fixedWithPrices (adds price_per_entry string) and combine with hourly
+        const combinedData = [...fixedWithPrices, ...hourly];
+        // Sort combined results by numeric project_id when possible (ascending)
+        combinedData.sort((a, b) => {
+            const aNum = parseInt(String(a.project_id || "").replace(/\D/g, ""), 10);
+            const bNum = parseInt(String(b.project_id || "").replace(/\D/g, ""), 10);
+            if (!isNaN(aNum) && !isNaN(bNum))
+                return aNum - bNum;
+            if (!isNaN(aNum))
+                return -1;
+            if (!isNaN(bNum))
+                return 1;
+            // Fallback to string compare
+            return String(a.project_id || "").localeCompare(String(b.project_id || ""));
+        });
         res.json({
             success: true,
             data: combinedData,
@@ -2610,7 +2624,7 @@ const rejectProject = async (req, res) => {
                 message: "Project ID is required.",
             });
         }
-        // ✅ Find project
+        // Find project
         const project = await Project_1.default.findOne({ project_id: projectId });
         if (!project) {
             return res.status(404).json({
@@ -2618,7 +2632,7 @@ const rejectProject = async (req, res) => {
                 message: "Project not found.",
             });
         }
-        // ✅ Reset project status and clear assignment
+        // Reset project status and clear assignment
         project.status = "pending";
         project.assigned_to = "";
         project.assigned_to_ids = "";
