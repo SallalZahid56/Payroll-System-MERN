@@ -2354,8 +2354,8 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
       {
         $lookup: {
           from: "hourlyprojectrecords",
-          localField: "project_id",     // ✅ plain id
-          foreignField: "project_id",   // ✅ plain id
+          localField: "project_id",     // plain id
+          foreignField: "project_id",   // plain id
           as: "hr",
         },
       },
@@ -2397,7 +2397,7 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
 
       return {
         ...item,
-        price_per_entry: prices.filter(Boolean).join(", "), // ✅ now lumpsum included
+        price_per_entry: prices.filter(Boolean).join(", "), // now lumpsum included
       };
     });
 
@@ -2416,7 +2416,19 @@ export const getCompanyPayroll = async (req: Request, res: Response) => {
 
     const grandSum = fixedSum + hourlySum;
 
-    const combinedData = [...fixed, ...hourly];
+    // Use fixedWithPrices (adds price_per_entry string) and combine with hourly
+    const combinedData = [...fixedWithPrices, ...hourly];
+
+    // Sort combined results by numeric project_id when possible (ascending)
+    combinedData.sort((a: any, b: any) => {
+      const aNum = parseInt(String(a.project_id || "").replace(/\D/g, ""), 10);
+      const bNum = parseInt(String(b.project_id || "").replace(/\D/g, ""), 10);
+      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      if (!isNaN(aNum)) return -1;
+      if (!isNaN(bNum)) return 1;
+      // Fallback to string compare
+      return String(a.project_id || "").localeCompare(String(b.project_id || ""));
+    });
 
     res.json({
       success: true,
@@ -2995,7 +3007,7 @@ export const rejectProject = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Find project
+    // Find project
     const project = await Project.findOne({ project_id: projectId });
 
     if (!project) {
@@ -3005,7 +3017,7 @@ export const rejectProject = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Reset project status and clear assignment
+    // Reset project status and clear assignment
     project.status = "pending";
     project.assigned_to = "";
     project.assigned_to_ids = "";

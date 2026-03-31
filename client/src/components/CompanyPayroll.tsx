@@ -7,7 +7,7 @@ type CompanyPayrollRow = {
   profile_name: string;
   sheet_name: string;
   price_per_entry?: string | number;       // hourly
-  price_worker_one?: number | null;        // ✅ add these
+  price_worker_one?: number | null;        // add these
   price_worker_two?: number | null;
   price_worker_three?: number | null;
   price_worker_four?: number | null;
@@ -75,7 +75,7 @@ export default function CompanyPayroll() {
     return true;
   });
 
-  // ✅ TOTAL BASED ON FILTERED RESULTS
+  // TOTAL BASED ON FILTERED RESULTS
   const total = filteredResults.reduce(
     (sum, r) => sum + r.profile_debit,
     0
