@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "../../utils/axios";
+import RevisionPreviewModal from "../../components/RevisionPreviewModal";
 
 interface CompletedProject {
     project_id: string;
@@ -24,6 +25,8 @@ export default function CompletedProjectsTable() {
     const [allProjectNames, setAllProjectNames] = useState<string[]>([]);
     const [selectedProject, setSelectedProject] = useState("");
     const [loading, setLoading] = useState(false);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalProjectId, setModalProjectId] = useState<string | null>(null);
 
     // Fetch all project names for dropdown
     useEffect(() => {
@@ -55,6 +58,16 @@ export default function CompletedProjectsTable() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const openModal = (projectId: string) => {
+        setModalProjectId(projectId);
+        setModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setModalOpen(false);
+        setModalProjectId(null);
     };
 
     return (
@@ -152,9 +165,29 @@ export default function CompletedProjectsTable() {
                                         <td className="px-4 py-2">{p.shift ?? "—"}</td>
                                         <td className="px-4 py-2">{p.revised ? "Yes" : "No"}</td>
                                         <td className="px-4 py-2">
-                                            <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                                                Edit
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                                                    Edit
+                                                </button>
+                                                <button onClick={() => openModal(p.project_id)} className="px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700">
+                                                    Revision
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm('Set this completed project back to pending?')) return;
+                                                        try {
+                                                            await axios.post('/admin/reject-project', { projectId: p.project_id });
+                                                            fetchCompletedProjects(selectedProject);
+                                                        } catch (err) {
+                                                            console.error('Failed to set pending', err);
+                                                            alert('Failed to set project to pending');
+                                                        }
+                                                    }}
+                                                    className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                                >
+                                                    Set Pending
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -163,6 +196,7 @@ export default function CompletedProjectsTable() {
                     </div>
                 )}
             </div>
+            <RevisionPreviewModal projectId={modalProjectId} isOpen={modalOpen} onClose={closeModal} onApplied={() => fetchCompletedProjects(selectedProject)} />
         </div>
     );
 }

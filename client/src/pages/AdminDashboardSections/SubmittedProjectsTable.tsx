@@ -289,7 +289,7 @@ export default function SubmittedProjectsTable() {
                       onClick={() => handleApprove(p)}
                       className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                     >
-                      ✅ Approve
+                      Approve
                     </button>
 
                     <button

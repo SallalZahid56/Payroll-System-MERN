@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { applyRevisionInternal } from './payrollController';
 import Project from "../models/Project";
 import User from "../models/user";
 import Column from "../models/column";
@@ -11,11 +12,13 @@ import mongoose from "mongoose";
 const db = mongoose.connection;
 
 
-// Create a dynamic model for project_data collection
-const ProjectData = mongoose.model(
-  "ProjectData",
-  new mongoose.Schema({}, { strict: false, collection: "project_data" })
-);
+// Reuse existing ProjectData model if already compiled, avoid OverwriteModelError
+const ProjectData =
+  (mongoose.models && (mongoose.models as any).ProjectData) ||
+  mongoose.model(
+    "ProjectData",
+    new mongoose.Schema({}, { strict: false, collection: "project_data" })
+  );
 
 // Define TypeScript interface for type safety
 interface IProjectData {
@@ -1114,7 +1117,7 @@ export const syncAllProjects = async (): Promise<{ success: boolean; message: st
       console.log(`📊 [${matchedTab}] Sheet has ${sheetRows.length} rows.`);
 
       // Get existing saved data from MongoDB
-      const existing = await ProjectData.findOne({ project_id }).lean<IProjectData>();
+      const existing = (await ProjectData.findOne({ project_id }).lean()) as IProjectData | null;
 
       let dbDataArray: any[] = [];
       if (existing && Array.isArray(existing.row_data) && existing.row_data.length > 0) {
@@ -2721,6 +2724,19 @@ export const approveSingleEntryProject = async (
     const totalEntries = Object.values(entryCounts).reduce<number>((a, b) => a + b, 0);
     const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
 
+    // If the project is already completed (treated as paid), create payroll adjustments
+    // instead of directly overwriting workersalaries.
+    if (project.status === "completed") {
+      try {
+        await applyRevisionInternal({ projectId, reason: 'Approved via admin (single-entry)', applyMode: 'applied', created_by: (req as any)?.user?.name || null });
+        await Project.updateOne({ project_id: projectId }, { status: "completed" });
+        return res.json({ success: true, message: 'Single entry project approved and adjustments created (project already completed)' });
+      } catch (e) {
+        console.error('Error creating adjustments for completed project:', e);
+        return res.status(500).json({ success: false, message: 'Failed to create adjustments for completed project' });
+      }
+    }
+
     for (const worker of Object.keys(salaries)) {
       const salary = salaries[worker];
       const entries = entryCounts[worker];
@@ -2875,6 +2891,18 @@ export const approveMultiEntryProject = async (
 
     // Calculate total profile debit
     const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
+
+    // If project already marked completed (treated as paid), create payroll adjustments
+    if (project.status === "completed") {
+      try {
+        await applyRevisionInternal({ projectId, reason: 'Approved via admin (multi-entry)', applyMode: 'applied', created_by: (req as any)?.user?.name || null });
+        await Project.updateOne({ project_id: projectId }, { status: "completed" });
+        return res.json({ success: true, message: 'Multi-entry project approved and adjustments created (project already completed)' });
+      } catch (e) {
+        console.error('Error creating adjustments for completed multi-entry project:', e);
+        return res.status(500).json({ success: false, message: 'Failed to create adjustments for completed project' });
+      }
+    }
 
     const WorkerSalaryCollection = db.collection("workersalaries");
     const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");

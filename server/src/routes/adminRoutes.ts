@@ -49,6 +49,15 @@ import {
   saveHourlyCalculation,
   markProjectCompleted
 } from "../controllers/adminController";
+import {
+  createAdjustment,
+  listAdjustments,
+  markAdjustmentApplied,
+  createPayrollRun,
+  listPayrollRuns,
+  previewRevision,
+  createProjectRevisionRecord,
+} from "../controllers/payrollController";
 
 const router = express.Router();
 
@@ -104,6 +113,17 @@ router.post("/approve-lumpsum", approveLumpsumProject);
 router.post("/reject-project", rejectProject);
 router.post("/save-hourly-calculation", saveHourlyCalculation);
 router.post("/mark-project-completed", markProjectCompleted);
+
+// Payroll / Revisions
+router.post('/payroll-adjustments', createAdjustment);
+router.get('/payroll-adjustments', listAdjustments);
+router.post('/payroll-adjustments/:id/apply', markAdjustmentApplied);
+
+router.post('/payroll-runs', createPayrollRun);
+router.get('/payroll-runs', listPayrollRuns);
+
+router.post('/revisions/preview', previewRevision);
+router.post('/revisions', createProjectRevisionRecord);
 
 
 
