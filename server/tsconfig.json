@@ -3,7 +3,6 @@
     "target": "ES2020",
     "module": "commonjs",
     "moduleResolution": "node10",    // keep this if you rely on old behavior
-    "ignoreDeprecations": "6.0",     // silences the deprecation warning
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
