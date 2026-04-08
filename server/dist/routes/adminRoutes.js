@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const adminController_1 = require("../controllers/adminController");
+const payrollController_1 = require("../controllers/payrollController");
 const router = express_1.default.Router();
 // Project management routes
 router.get("/users", adminController_1.getUsers);
@@ -58,4 +59,12 @@ router.post("/approve-lumpsum", adminController_1.approveLumpsumProject);
 router.post("/reject-project", adminController_1.rejectProject);
 router.post("/save-hourly-calculation", adminController_1.saveHourlyCalculation);
 router.post("/mark-project-completed", adminController_1.markProjectCompleted);
+// Payroll / Revisions
+router.post('/payroll-adjustments', payrollController_1.createAdjustment);
+router.get('/payroll-adjustments', payrollController_1.listAdjustments);
+router.post('/payroll-adjustments/:id/apply', payrollController_1.markAdjustmentApplied);
+router.post('/payroll-runs', payrollController_1.createPayrollRun);
+router.get('/payroll-runs', payrollController_1.listPayrollRuns);
+router.post('/revisions/preview', payrollController_1.previewRevision);
+router.post('/revisions', payrollController_1.createProjectRevisionRecord);
 exports.default = router;

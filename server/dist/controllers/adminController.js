@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPayrollInfonavBwp = exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
 exports.markProjectCompleted = exports.getPayrollFzBwp = void 0;
+const payrollController_1 = require("./payrollController");
 const Project_1 = __importDefault(require("../models/Project"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
@@ -14,8 +15,9 @@ const googleapis_1 = require("googleapis");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const db = mongoose_1.default.connection;
-// Create a dynamic model for project_data collection
-const ProjectData = mongoose_1.default.model("ProjectData", new mongoose_1.default.Schema({}, { strict: false, collection: "project_data" }));
+// Reuse existing ProjectData model if already compiled, avoid OverwriteModelError
+const ProjectData = (mongoose_1.default.models && mongoose_1.default.models.ProjectData) ||
+    mongoose_1.default.model("ProjectData", new mongoose_1.default.Schema({}, { strict: false, collection: "project_data" }));
 /* -------------------- 🔹 Get Users with Pagination + Search -------------------- */
 const getUsers = async (req, res) => {
     try {
@@ -952,7 +954,7 @@ const syncAllProjects = async () => {
             const sheetRows = sheetData.slice(1);
             console.log(`📊 [${matchedTab}] Sheet has ${sheetRows.length} rows.`);
             // Get existing saved data from MongoDB
-            const existing = await ProjectData.findOne({ project_id }).lean();
+            const existing = (await ProjectData.findOne({ project_id }).lean());
             let dbDataArray = [];
             if (existing && Array.isArray(existing.row_data) && existing.row_data.length > 0) {
                 dbDataArray = existing.row_data;
@@ -2395,6 +2397,19 @@ const approveSingleEntryProject = async (req, res) => {
         });
         const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
         const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
+        // If the project is already completed (treated as paid), create payroll adjustments
+        // instead of directly overwriting workersalaries.
+        if (project.status === "completed") {
+            try {
+                await (0, payrollController_1.applyRevisionInternal)({ projectId, reason: 'Approved via admin (single-entry)', applyMode: 'applied', created_by: req?.user?.name || null });
+                await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
+                return res.json({ success: true, message: 'Single entry project approved and adjustments created (project already completed)' });
+            }
+            catch (e) {
+                console.error('Error creating adjustments for completed project:', e);
+                return res.status(500).json({ success: false, message: 'Failed to create adjustments for completed project' });
+            }
+        }
         for (const worker of Object.keys(salaries)) {
             const salary = salaries[worker];
             const entries = entryCounts[worker];
@@ -2529,6 +2544,18 @@ const approveMultiEntryProject = async (req, res) => {
         }
         // Calculate total profile debit
         const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
+        // If project already marked completed (treated as paid), create payroll adjustments
+        if (project.status === "completed") {
+            try {
+                await (0, payrollController_1.applyRevisionInternal)({ projectId, reason: 'Approved via admin (multi-entry)', applyMode: 'applied', created_by: req?.user?.name || null });
+                await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
+                return res.json({ success: true, message: 'Multi-entry project approved and adjustments created (project already completed)' });
+            }
+            catch (e) {
+                console.error('Error creating adjustments for completed multi-entry project:', e);
+                return res.status(500).json({ success: false, message: 'Failed to create adjustments for completed project' });
+            }
+        }
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
         // Update salaries in DB
