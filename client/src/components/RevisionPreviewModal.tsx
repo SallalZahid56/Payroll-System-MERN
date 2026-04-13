@@ -36,7 +36,9 @@ export default function RevisionPreviewModal({ projectId, isOpen, onClose, onApp
     setLoading(true);
     (async () => {
       try {
+        console.log('RevisionPreviewModal: requesting preview for', projectId);
         const res = await axios.post("/admin/revisions/preview", { projectId });
+        console.log('RevisionPreviewModal: preview response', res?.data);
         const data = res.data;
         const list: WorkerDiff[] = Array.isArray(data.workers) ? data.workers : [];
         setWorkers(list);
@@ -57,7 +59,10 @@ export default function RevisionPreviewModal({ projectId, isOpen, onClose, onApp
   const apply = async (mode: "pending" | "auto") => {
     if (!projectId) return;
     const applyWorkers = Object.keys(selected).filter(k => selected[k]);
-    if (applyWorkers.length === 0) return alert("Select at least one worker");
+    if (applyWorkers.length === 0) {
+      console.warn('RevisionPreviewModal: no workers selected to apply', { selected, workers });
+      return alert("Select at least one worker");
+    }
 
     try {
       setLoading(true);
@@ -113,19 +118,25 @@ export default function RevisionPreviewModal({ projectId, isOpen, onClose, onApp
                   </tr>
                 </thead>
                 <tbody>
-                  {workers.map(w => (
-                    <tr key={w.worker} className="border-t">
-                      <td className="p-2 text-center">
-                        <input type="checkbox" checked={!!selected[w.worker]} onChange={() => toggle(w.worker)} />
-                      </td>
-                      <td className="p-2">{w.worker}</td>
-                      <td className="p-2">{w.oldSalary ?? 0}</td>
-                      <td className="p-2">{w.newSalary ?? 0}</td>
-                      <td className="p-2">{(w.diff ?? 0).toFixed(2)}</td>
-                      <td className="p-2">{w.oldEntries ?? "-"}</td>
-                      <td className="p-2">{w.newEntries ?? "-"}</td>
+                  {workers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-4 text-center text-gray-500">No changes detected for this project.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    workers.map(w => (
+                      <tr key={w.worker} className="border-t">
+                        <td className="p-2 text-center">
+                          <input type="checkbox" checked={!!selected[w.worker]} onChange={() => toggle(w.worker)} />
+                        </td>
+                        <td className="p-2">{w.worker}</td>
+                        <td className="p-2">{w.oldSalary ?? 0}</td>
+                        <td className="p-2">{w.newSalary ?? 0}</td>
+                        <td className="p-2">{(w.diff ?? 0).toFixed(2)}</td>
+                        <td className="p-2">{w.oldEntries ?? "-"}</td>
+                        <td className="p-2">{w.newEntries ?? "-"}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -135,11 +146,11 @@ export default function RevisionPreviewModal({ projectId, isOpen, onClose, onApp
               <input value={reason} onChange={e => setReason(e.target.value)} className="w-full border rounded px-3 py-2" />
             </div>
 
-            <div className="flex gap-2 justify-end">
-              <button className="px-4 py-2 bg-gray-200 rounded" onClick={onClose}>Cancel</button>
-              <button className="px-4 py-2 bg-amber-600 text-white rounded" onClick={() => apply("pending")}>Save As Pending</button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded" onClick={() => apply("auto")}>Apply Now</button>
-            </div>
+              <div className="flex gap-2 justify-end">
+                <button className="px-4 py-2 bg-gray-200 rounded" onClick={onClose}>Cancel</button>
+                <button className="px-4 py-2 bg-amber-600 text-white rounded" onClick={() => apply("pending")} disabled={workers.length === 0}>Save As Pending</button>
+                <button className="px-4 py-2 bg-green-600 text-white rounded" onClick={() => apply("auto")} disabled={workers.length === 0}>Apply Now</button>
+              </div>
           </div>
         )}
       </div>
