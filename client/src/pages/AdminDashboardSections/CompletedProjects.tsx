@@ -91,20 +91,22 @@ export default function CompletedProjectsTable() {
                 </button>
             </div>
 
-            {/* Project selector */}
+            {/* Project selector (searchable single selection) */}
             <div className="flex flex-wrap gap-4 items-end mb-4">
                 <div className="flex flex-col">
                     <label className="text-sm text-gray-700">Select Project</label>
-                    <select
+                    <input
+                        list="project-list"
                         className="border rounded px-3 py-2"
                         value={selectedProject}
                         onChange={e => setSelectedProject(e.target.value)}
-                    >
-                        <option value="">-- Select a Project --</option>
+                        placeholder="Type to search projects..."
+                    />
+                    <datalist id="project-list">
                         {allProjectNames.map(name => (
-                            <option key={name} value={name}>{name}</option>
+                            <option key={name} value={name} />
                         ))}
-                    </select>
+                    </datalist>
                 </div>
                 <button
                     className="px-4 py-2 bg-purple-700 text-white rounded"
