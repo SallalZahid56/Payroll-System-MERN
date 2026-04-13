@@ -40,7 +40,12 @@ export default function RevisionPreviewModal({ projectId, isOpen, onClose, onApp
         const res = await axios.post("/admin/revisions/preview", { projectId });
         console.log('RevisionPreviewModal: preview response', res?.data);
         const data = res.data;
-        const list: WorkerDiff[] = Array.isArray(data.workers) ? data.workers : [];
+        // Support server returning either `workers` (old) or `preview` (current)
+        const list: WorkerDiff[] = Array.isArray(data.workers)
+          ? data.workers
+          : Array.isArray(data.preview)
+          ? data.preview
+          : [];
         setWorkers(list);
         const sel: Record<string, boolean> = {};
         list.forEach((w) => (sel[w.worker] = true));
