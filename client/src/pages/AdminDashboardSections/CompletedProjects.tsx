@@ -176,13 +176,13 @@ export default function CompletedProjectsTable() {
                                                 </button>
                                                 <button
                                                     onClick={async () => {
-                                                        if (!confirm('Set this completed project back to pending?')) return;
+                                                        if (!confirm('Set this completed project back to pending for revision?')) return;
                                                         try {
-                                                            await axios.post('/admin/reject-project', { projectId: p.project_id });
+                                                            await axios.post('/admin/mark-project-pending-for-revision', { projectId: p.project_id, reason: 'Marked from Completed UI' });
                                                             fetchCompletedProjects(selectedProject);
                                                         } catch (err) {
-                                                            console.error('Failed to set pending', err);
-                                                            alert('Failed to set project to pending');
+                                                            console.error('Failed to set pending for revision', err);
+                                                            alert('Failed to set project to pending for revision');
                                                         }
                                                     }}
                                                     className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"

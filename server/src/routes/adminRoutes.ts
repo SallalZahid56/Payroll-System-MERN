@@ -36,6 +36,7 @@ import {
   getCompanyPayroll,
   getSubmittedProjects,
   getCompletedProjects, getCompletedProjectNames,
+  getPendingRevisions,
   getDeletableProjectNames,
   getDeletableProjects,
   deleteProject,
@@ -49,6 +50,7 @@ import {
   saveHourlyCalculation,
   markProjectCompleted
 } from "../controllers/adminController";
+import { markProjectPendingForRevision } from "../controllers/adminController";
 import {
   createAdjustment,
   listAdjustments,
@@ -101,6 +103,7 @@ router.get("/payroll-company/:company", getCompanyPayroll);
 router.get("/submitted-projects", getSubmittedProjects);
 router.get("/get-completed-projects", getCompletedProjects);
 router.get("/get-completed-project-names", getCompletedProjectNames);
+router.get("/get-pending-revisions", getPendingRevisions);
 router.get("/get-deletable-project-names", getDeletableProjectNames);
 router.get("/get-deletable-projects", getDeletableProjects);
 router.delete("/delete-project/:projectId", deleteProject);
@@ -113,6 +116,7 @@ router.post("/approve-lumpsum", approveLumpsumProject);
 router.post("/reject-project", rejectProject);
 router.post("/save-hourly-calculation", saveHourlyCalculation);
 router.post("/mark-project-completed", markProjectCompleted);
+router.post("/mark-project-pending-for-revision", markProjectPendingForRevision);
 
 // Payroll / Revisions
 router.post('/payroll-adjustments', createAdjustment);

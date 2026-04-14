@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { applyRevisionInternal } from './payrollController';
 import Project from "../models/Project";
+import ProjectRevision from "../models/projectRevision";
 import User from "../models/user";
 import Column from "../models/column";
 import bcrypt from "bcryptjs";
@@ -2510,6 +2511,17 @@ export const getCompletedProjectNames = async (req: Request, res: Response) => {
   }
 };
 
+// Get projects that are pending revision (marked revised and set back to pending)
+export const getPendingRevisions = async (_req: Request, res: Response) => {
+  try {
+    const projects = await Project.find({ status: 'pending', is_revised: true }).lean().sort({ updated_at: -1 });
+    res.json({ success: true, projects });
+  } catch (err) {
+    console.error('Error fetching pending revisions:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // -------------------------
 // Deletable Projects
 // -------------------------
@@ -3393,5 +3405,43 @@ export const markProjectCompleted = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error marking project as completed:", error);
     res.status(500).json({ success: false, message: "Failed to mark project as completed" });
+  }
+};
+
+// Mark project as pending for revision: snapshot current workersalaries and set project to pending
+export const markProjectPendingForRevision = async (req: Request, res: Response) => {
+  try {
+    const { projectId, reason, performedBy } = req.body;
+    if (!projectId) return res.status(400).json({ success: false, message: 'projectId required' });
+
+    const project = await Project.findOne({ project_id: projectId });
+    if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Snapshot current workersalaries
+    const WorkerSalaryCollection = db.collection('workersalaries');
+    const rows = await WorkerSalaryCollection.find({ project_id: projectId }).toArray();
+
+    const worker_diffs = (rows || []).map((r: any) => ({
+      worker_name: r.worker_name,
+      old_salary: Number(r.salary || 0),
+      new_salary: Number(r.salary || 0),
+      diff: 0,
+      old_entries: Number(r.no_of_entries || 0),
+      new_entries: Number(r.no_of_entries || 0),
+    }));
+
+    // Create a ProjectRevision snapshot record
+    await ProjectRevision.create({ project_id: projectId, created_by: performedBy || null, summary: 'Snapshot before revision', worker_diffs, notes: reason || '' });
+
+    // Mark project as revised and pending
+    project.is_revised = true;
+    project.status = 'pending';
+    if (!project.original_completed_at) project.original_completed_at = new Date();
+    await project.save();
+
+    res.json({ success: true, message: 'Project marked pending for revision and snapshot saved' });
+  } catch (err) {
+    console.error('Error marking project pending for revision:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
