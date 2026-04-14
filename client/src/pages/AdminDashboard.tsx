@@ -11,6 +11,7 @@ import UnpricedAssignedTable from "./AdminDashboardSections/UnpricedAssignedTabl
 import PayrollDashboard from "./AdminDashboardSections/PayrollDashboard";
 import SubmittedProjectsTable from "./AdminDashboardSections/SubmittedProjectsTable";
 import CompletedProjectsTable from "./AdminDashboardSections/CompletedProjects";
+import PendingRevisions from "./AdminDashboardSections/PendingRevisions";
 import TopBar from "../components/TopBar";
 import DeleteProjectTable from "./AdminDashboardSections/DeleteProjectTable";
 import ProjectExpenseTable from "./AdminDashboardSections/ProjectExpenseTable";
@@ -52,6 +53,8 @@ export default function AdminDashboard() {
         return <PayrollDashboard onCardClick={handlePayrollCardClick} />; // pass collapse handler
       case "completed-projects":
         return <CompletedProjectsTable />;
+      case "pending-revisions":
+        return <PendingRevisions />;
       case "submitted-projects":
         return <SubmittedProjectsTable />;
       case "delete-projects":

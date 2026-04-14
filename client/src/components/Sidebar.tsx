@@ -80,6 +80,7 @@ export default function Sidebar({
             label: "Completed Projects",
             icon: CheckCircle2,
           },
+              !hideUsers && { id: "pending-revisions", label: "Pending Revisions", icon: ClipboardCheck },
           { id: "submitted-projects", label: "Submitted Projects", icon: ClipboardCheck },
           // Only show Delete a Project for dashboards that opt-in
           showDeleteProject && { id: "delete-projects", label: "Delete a Project", icon: Trash },
