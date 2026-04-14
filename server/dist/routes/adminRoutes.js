@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const adminController_1 = require("../controllers/adminController");
+const adminController_2 = require("../controllers/adminController");
 const payrollController_1 = require("../controllers/payrollController");
 const router = express_1.default.Router();
 // Project management routes
@@ -47,6 +48,7 @@ router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
 router.get("/submitted-projects", adminController_1.getSubmittedProjects);
 router.get("/get-completed-projects", adminController_1.getCompletedProjects);
 router.get("/get-completed-project-names", adminController_1.getCompletedProjectNames);
+router.get("/get-pending-revisions", adminController_1.getPendingRevisions);
 router.get("/get-deletable-project-names", adminController_1.getDeletableProjectNames);
 router.get("/get-deletable-projects", adminController_1.getDeletableProjects);
 router.delete("/delete-project/:projectId", adminController_1.deleteProject);
@@ -59,6 +61,7 @@ router.post("/approve-lumpsum", adminController_1.approveLumpsumProject);
 router.post("/reject-project", adminController_1.rejectProject);
 router.post("/save-hourly-calculation", adminController_1.saveHourlyCalculation);
 router.post("/mark-project-completed", adminController_1.markProjectCompleted);
+router.post("/mark-project-pending-for-revision", adminController_2.markProjectPendingForRevision);
 // Payroll / Revisions
 router.post('/payroll-adjustments', payrollController_1.createAdjustment);
 router.get('/payroll-adjustments', payrollController_1.listAdjustments);

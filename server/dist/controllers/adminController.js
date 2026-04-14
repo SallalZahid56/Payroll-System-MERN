@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPayrollInfonavBwp = exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
-exports.markProjectCompleted = exports.getPayrollFzBwp = void 0;
+exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getPendingRevisions = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.markProjectPendingForRevision = exports.markProjectCompleted = exports.getPayrollFzBwp = exports.getPayrollInfonavBwp = void 0;
 const payrollController_1 = require("./payrollController");
 const Project_1 = __importDefault(require("../models/Project"));
+const projectRevision_1 = __importDefault(require("../models/projectRevision"));
 const user_1 = __importDefault(require("../models/user"));
 const column_1 = __importDefault(require("../models/column"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -2212,6 +2213,18 @@ const getCompletedProjectNames = async (req, res) => {
     }
 };
 exports.getCompletedProjectNames = getCompletedProjectNames;
+// Get projects that are pending revision (marked revised and set back to pending)
+const getPendingRevisions = async (_req, res) => {
+    try {
+        const projects = await Project_1.default.find({ status: 'pending', is_revised: true }).lean().sort({ updated_at: -1 });
+        res.json({ success: true, projects });
+    }
+    catch (err) {
+        console.error('Error fetching pending revisions:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+exports.getPendingRevisions = getPendingRevisions;
 // -------------------------
 // Deletable Projects
 // -------------------------
@@ -2975,3 +2988,39 @@ const markProjectCompleted = async (req, res) => {
     }
 };
 exports.markProjectCompleted = markProjectCompleted;
+// Mark project as pending for revision: snapshot current workersalaries and set project to pending
+const markProjectPendingForRevision = async (req, res) => {
+    try {
+        const { projectId, reason, performedBy } = req.body;
+        if (!projectId)
+            return res.status(400).json({ success: false, message: 'projectId required' });
+        const project = await Project_1.default.findOne({ project_id: projectId });
+        if (!project)
+            return res.status(404).json({ success: false, message: 'Project not found' });
+        // Snapshot current workersalaries
+        const WorkerSalaryCollection = db.collection('workersalaries');
+        const rows = await WorkerSalaryCollection.find({ project_id: projectId }).toArray();
+        const worker_diffs = (rows || []).map((r) => ({
+            worker_name: r.worker_name,
+            old_salary: Number(r.salary || 0),
+            new_salary: Number(r.salary || 0),
+            diff: 0,
+            old_entries: Number(r.no_of_entries || 0),
+            new_entries: Number(r.no_of_entries || 0),
+        }));
+        // Create a ProjectRevision snapshot record
+        await projectRevision_1.default.create({ project_id: projectId, created_by: performedBy || null, summary: 'Snapshot before revision', worker_diffs, notes: reason || '' });
+        // Mark project as revised and pending
+        project.is_revised = true;
+        project.status = 'pending';
+        if (!project.original_completed_at)
+            project.original_completed_at = new Date();
+        await project.save();
+        res.json({ success: true, message: 'Project marked pending for revision and snapshot saved' });
+    }
+    catch (err) {
+        console.error('Error marking project pending for revision:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+exports.markProjectPendingForRevision = markProjectPendingForRevision;

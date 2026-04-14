@@ -211,10 +211,28 @@ const previewRevision = async (req, res) => {
         // Read existing worker salaries from workersalaries collection
         const WorkerSalaryCollection = db.collection('workersalaries');
         const preview = [];
+        // Try to use a saved snapshot revision (created when project was marked pending for revision)
+        const snapshot = await projectRevision_1.default.findOne({ project_id: projectId, summary: /snapshot/i }).sort({ created_at: -1 }).lean();
+        const snapshotMap = {};
+        if (snapshot && Array.isArray(snapshot.worker_diffs)) {
+            for (const wd of snapshot.worker_diffs) {
+                if (wd && wd.worker_name) {
+                    snapshotMap[wd.worker_name] = { oldSalary: Number(wd.old_salary || 0), oldEntries: Number(wd.old_entries || 0) };
+                }
+            }
+        }
         for (const workerName of Object.keys(projectedSalaries)) {
-            const existing = await WorkerSalaryCollection.findOne({ worker_name: workerName, project_id: projectId });
-            const oldSalary = Number(existing?.salary || 0);
-            const oldEntries = Number(existing?.no_of_entries || 0);
+            let oldSalary = 0;
+            let oldEntries = 0;
+            if (snapshotMap[workerName]) {
+                oldSalary = snapshotMap[workerName].oldSalary;
+                oldEntries = snapshotMap[workerName].oldEntries;
+            }
+            else {
+                const existing = await WorkerSalaryCollection.findOne({ worker_name: workerName, project_id: projectId });
+                oldSalary = Number(existing?.salary || 0);
+                oldEntries = Number(existing?.no_of_entries || 0);
+            }
             const newSalary = Number(projectedSalaries[workerName].salary || 0);
             const newEntries = Number(projectedSalaries[workerName].entries || 0);
             preview.push({ worker: workerName, oldSalary, newSalary, diff: newSalary - oldSalary, oldEntries, newEntries });
