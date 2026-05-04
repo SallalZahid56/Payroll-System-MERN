@@ -247,18 +247,22 @@ exports.getColumns = getColumns;
 /* -------------------- 🔹 Get Next Project Values -------------------- */
 const getNextProjectValues = async (_req, res) => {
     try {
-        // Get the latest project by project_id
-        const latest = await Project_1.default.findOne({
-            project_id: { $regex: /^PROJ-\d+$/ }
-        }).sort({ project_id: -1 });
-        let nextNumber = 1;
-        if (latest?.project_id) {
-            const match = latest.project_id.match(/PROJ-(\d+)/);
-            if (match) {
-                nextNumber = parseInt(match[1], 10) + 1;
+        // Compute the current maximum numeric suffix for project_id by scanning all PROJ-\d+ entries.
+        // This is robust across Mongo versions and guarantees correct numeric ordering beyond 999.
+        const rows = await Project_1.default.find({ project_id: { $regex: /^PROJ-\d+$/ } }).select("project_id").lean();
+        let max = 0;
+        for (const r of rows) {
+            const m = String(r.project_id).match(/PROJ-(\d+)/);
+            if (m) {
+                const n = parseInt(m[1], 10);
+                if (!isNaN(n) && n > max)
+                    max = n;
             }
         }
-        const nextProjectId = `PROJ-${String(nextNumber).padStart(3, "0")}`;
+        const nextNumber = max + 1;
+        // Keep at least 3 digits padding for aesthetics, but allow larger numbers naturally
+        const pad = Math.max(3, String(nextNumber).length);
+        const nextProjectId = `PROJ-${String(nextNumber).padStart(pad, "0")}`;
         const nextProjectName = `Project-${nextNumber}`;
         res.json({
             success: true,
