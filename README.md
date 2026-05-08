@@ -1,118 +1,124 @@
+<!--
+  Comprehensive README for payroll-system-mern
+  Generated/maintained by developer assistant — edit to match your deployment details.
+-->
+
 # Payroll System (MERN)
 
-**A payroll and project management system** built with a React + TypeScript frontend and a Node/Express + MongoDB backend. The server synchronizes project data with Google Sheets and provides role-based features (admin, manager, user, profile). ✅
+A payroll and project management system with a React + TypeScript frontend and a Node/Express + MongoDB backend. The server integrates with Google Sheets, supports role-based access (admin/manager/profile/user), and includes payroll reports, project assignment, and a revision workflow.
+
+Contents
+- Project overview
+- Quick start (dev)
+- Architecture & folders
+- Environment variables
+- Scripts
+- Common tasks (seeding, syncing, sheets)
+- Development notes & troubleshooting
+- Revision workflow overview
+- Contributing
 
 ---
 
-## Table of Contents
-- [Project Overview](#project-overview)
-- [Key Features](#key-features)
-- [Tech Stack](#tech-stack)
-- [Repository Layout](#repository-layout)
-- [Environment Variables](#environment-variables)
-- [Local Setup (Development)](#local-setup-development)
-- [Seeding Admin Account](#seeding-admin-account)
-- [API Highlights](#api-highlights)
-- [Google Sheets Integration](#google-sheets-integration)
-- [Notes & Security](#notes--security)
-- [Contributing](#contributing)
-- [License](#license)
+## Project overview
+This app manages projects (fixed or hourly), assigns them to users, synchronizes project rows from Google Sheets to MongoDB, and computes payroll and adjustments. Admins can mark completed projects as pending revision, preview differences versus saved snapshots, and apply payroll adjustments on re-approval.
 
----
+## Quick start (development)
+1. Install dependencies
 
-## Project Overview
-This application is a payroll/project management system designed to track and assign projects (fixed/hourly), manage users and profiles, and compute payroll summaries. The backend includes a scheduled sync that reads Google Sheets tabs for project data and stores it in MongoDB to power payroll reports.
+```bash
+# from repo root
+cd server && npm install
+cd ../client && npm install
+```
 
-## Key Features
-- Role-based access (admin, manager, user, profile)
-- Add, assign, and manage fixed and hourly projects
-- Sync project data from Google Sheets (automated scheduler)
-- Payroll reporting: per-user, per-profile, company-specific and filtered views
-- Google OAuth login + email/password authentication
-- Admin utilities: user management, project column writing, and sync control
+2. Run both servers (from repo root)
 
-## Tech Stack
-- Frontend: React, TypeScript, Vite, Tailwind CSS
-- Backend: Node.js, Express, TypeScript
-- Database: MongoDB (mongoose)
-- Google APIs: Google Sheets API for synchronization
-- Authentication: JWT, bcrypt
+```bash
+npm run dev
+```
 
-## Repository Layout
-- /client — React + TypeScript frontend (Vite)
-  - Main pages: `Login`, `Signup`, `AdminDashboard`, `ManagerDashboard`, `UserDashboard`
-- /server — Express API (TypeScript)
-  - `src/controllers` — business logic (auth, admin, manager)
-  - `src/models` — Mongoose models (`User`, `Project`, `Column`)
-  - `src/config` — Google Sheets client
-  - `src/utils` — scheduled sync (`syncScheduler`)
-  - `src/routes` — API routes
+3. Open the frontend (Vite) in the browser (default port 5173) and the API server (default port 5000).
 
-## Environment Variables
-Create a `.env` in `/server` (or use your deployment env) and set at least:
+Notes: if ports differ, check `server/package.json` and `client/package.json` scripts.
 
-- `PORT` — server port (e.g., 5000)
-- `MONGO_URI` — MongoDB connection URI
-- `JWT_SECRET` — secret for JWT signing
-- `VITE_GOOGLE_CLIENT_ID` — Google OAuth client ID (frontend)
-- `GOOGLE_SERVICE_ACCOUNT_BASE64` — base64-encoded service account JSON contents (used to create `google-service.json` at runtime)
+## Architecture & important folders
+- `/client` — React + TypeScript (Vite). UI components, pages, and API calls.
+- `/server` — Express + TypeScript. Controllers, models, routes, and utils.
+  - `src/controllers` — controller functions for admin, manager, payroll logic
+  - `src/models` — Mongoose models (`Project`, `User`, etc.)
+  - `src/routes` — route registrations
+  - `src/config` — Google Sheets setup and auth
+  - `src/utils` — schedulers (sync), helper scripts
 
-Important: Do NOT commit secrets to the repo. The included `.env` in this workspace contains example values—replace with your own.
+## Environment variables (server)
+Create a `.env` in `/server` with at least these values:
 
-## Local Setup (Development)
-1. Install dependencies in both root scripts (concurrently) if needed:
+- `PORT` — server port (default 5000)
+- `MONGO_URI` — MongoDB connection string
+- `JWT_SECRET` — JWT signing secret
+- `GOOGLE_SERVICE_ACCOUNT_BASE64` — base64-encoded Google service account JSON (optional, used to create `google-service.json` at runtime)
+- `VITE_GOOGLE_CLIENT_ID` — frontend Google OAuth client ID (used by client)
 
-   - Install server deps: cd server && npm install
-   - Install client deps: cd client && npm install
+Keep secrets out of source control.
 
-2. Start both client and server concurrently from the repository root:
+## Useful npm scripts
 
-   ```bash
-   npm run dev
-   ```
+From `server`:
+- `npm run dev` — run server in dev mode (ts-node / nodemon)
+- `npm run build` — build server (if present)
+- `npm run seed` — seed admin user (if available)
 
-   - Server default port: 5000
-   - Frontend dev server (Vite) default: 5173
+From `client`:
+- `npm run dev` — start Vite dev server
+- `npm run build` — build production bundle
 
-3. Open the app in your browser and login/signup.
+Top-level `npm run dev` may run both client and server concurrently (check `package.json`).
 
-## Seeding Admin Account
-The server includes a seed script to create an admin user:
+## Seeding & test data
+- To create an admin user (if seed script exists):
 
 ```bash
 cd server
 npm run seed
 ```
 
-## API Highlights
-- `POST /api/auth/signup` — create user (email/password)
-- `POST /api/auth/login` — login (email/password)
-- `POST /api/auth/google-signup` — Google login/sign-up
-- Admin routes (prefix `/api/admin`): add projects, assign project, run sync, get payrolls, user management
-- Manager routes (prefix `/api/manager`): manager-specific project endpoints
+## Google Sheets integration
+- The server uses a service account to read and write Google Sheets for projects.
+- Provide `GOOGLE_SERVICE_ACCOUNT_BASE64` in `.env`; the server will write `google-service.json` on startup if present.
+- Key controller: `writeProjectColumns` ensures worker columns and headers exist for a project tab.
 
-For exact endpoints, check `server/src/routes/*` and controller methods in `server/src/controllers`.
+## Revision workflow (high level)
+- Admins can mark a completed project as "pending revision"; the server snapshots current `workersalaries` (project state) into a `projectRevision` record.
+- When the project is reprocessed (assign → submit → approve), the payroll controller provides preview endpoints to compute diffs vs snapshot.
+- On approval, the server can create `payrollAdjustment` records and update `workersalaries` accordingly.
 
-## Google Sheets Integration
-- The server uses a service account and the Sheets API to:
-  - Ensure project sheet headers/worker columns are present (`writeProjectColumns`)
-  - Periodically sync data (`syncAllProjects` called by `syncScheduler`)
-- Provide `GOOGLE_SERVICE_ACCOUNT_BASE64` env var: the app will write `google-service.json` at runtime when this value is present.
+## Next project ID behavior (important)
+- Project external IDs use the format `PROJ-<number>` (e.g., `PROJ-001`, `PROJ-1001`). The server endpoint `/admin/next-project-values` computes the next numeric suffix by scanning existing `project_id` values numerically, so IDs will continue increasing past `PROJ-999` (now yields `PROJ-1000`, `PROJ-1001`, etc.).
 
-## Notes & Security
-- The app contains sensitive environment examples in `/server/.env` — replace them with secure values and rotate credentials before deploying.
-- When deploying, ensure Google service account JSON and Mongo credentials are stored securely (e.g., secrets manager, not checked into source control).
+If you see the next Project ID reset unexpectedly, ensure:
+- The server is restarted after code changes.
+- You are calling `/admin/next-project-values` right before showing the Add Project form to avoid stale cached values.
+
+## Troubleshooting & tips
+- Duplicate key errors: `project_id` and `project_name` are unique. When updating a project via `/admin/update-project/:id` ensure:
+  - The URL uses the Mongo document `_id` (not the external `project_id`).
+  - The request body sends snake_case fields (e.g., `project_id`) if you intend to update those exact database fields.
+- Mongoose OverwriteModelError: occurs if models are redefined at runtime — server code reuses compiled models via `mongoose.models.X || mongoose.model(...)` in several places.
+
+## Running tests / validation
+- There are no automated tests included by default. For manual checks:
+  - Start the server, hit `/admin/next-project-values` to confirm next IDs.
+  - Use Postman or `curl` to call admin endpoints (add/update project) and inspect responses.
 
 ## Contributing
-- Please open an issue or PR describing your change. Follow existing code style (TypeScript, ESLint). Add tests or manual testing steps when relevant.
-
-## License
-This project does not include a license file. Add an appropriate open-source license if you plan to publish it.
+- Open issues or PRs; follow TypeScript patterns in controllers and models. Keep changes focused and add tests where useful.
 
 ---
 
-If you'd like, I can also:
-- Add an expanded section with example API requests and response samples ✅
-- Create a minimal `CONTRIBUTING.md` and `LICENSE` file
+If you want, I can also:
+- Add example `curl` requests for common admin endpoints
+- Create `CONTRIBUTING.md` and a basic `LICENSE` file
+- Add a short checklist to the Add Project form explaining `project_id` uniqueness
 
-Tell me which additions you want next.
+Which of those would you like next?
