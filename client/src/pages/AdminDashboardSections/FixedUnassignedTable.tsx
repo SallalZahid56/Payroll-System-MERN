@@ -43,7 +43,7 @@ export default function FixedUnassignedTable() {
   const filteredProjects = projects.filter((p) => {
     if (filterOption === "All") return true;
     if (filterOption === "Single Entry") return p.fixed_option === "Single Entry";
-    if (filterOption === "Multi Entry") return ["Double Entry","Triple Entry","Fourth Entry","Fifth Entry"].includes(p.fixed_option || "");
+    if (filterOption === "Multi Entry") return ["Double Entry", "Triple Entry", "Fourth Entry", "Fifth Entry"].includes(p.fixed_option || "");
     if (filterOption === "Lumpsum") return p.fixed_option === "Lumpsum";
     return true;
   });
@@ -126,6 +126,36 @@ export default function FixedUnassignedTable() {
     }
   };
 
+
+  const handleGoToAllProjects = async () => {
+    try {
+      for (const p of filteredProjects) {
+        // 1️⃣ Update project status to "In Work"
+        await axios.put(`/admin/update-project-status/${p.project_id}`, { status: "In Work" });
+
+        // 2️⃣ Fetch project details
+        const res = await axios.get(`/admin/get-project-details/${p.project_id}`);
+        if (!res.data.success) {
+          console.warn(`Skipping ${p.project_id}: details not found`);
+          continue;
+        }
+
+        // 3️⃣ Write worker columns
+        const writeRes = await axios.post(`/admin/write-project-columns/${p.project_id}`);
+        if (!writeRes.data.success) {
+          console.warn(`Skipping ${p.project_id}: column write failed`);
+          continue;
+        }
+      }
+
+      // 4️⃣ Refresh table once after all done
+      fetchUnassignedProjects();
+    } catch (err) {
+      console.error("Error processing all projects:", err);
+      alert("Something went wrong while processing projects.");
+    }
+  };
+
   // ---------------- RENDER CELL ----------------
   const renderCell = (p: Project, field: keyof Project) => {
     if (editRowId === p._id) {
@@ -200,7 +230,7 @@ export default function FixedUnassignedTable() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => { setShowAssignModal(true); setSelectedProjectId(null); }}
+            onClick={() => { setShowAssignModal(true); setSelectedProjectId(null); handleGoToAllProjects(); }}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm"
           >
             Assign All ({filteredProjects.length})
