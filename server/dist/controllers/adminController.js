@@ -2378,28 +2378,39 @@ const approveSingleEntryProject = async (req, res) => {
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
         // If client provided salaries explicitly, use them (useful when ProjectData isn't available)
         if (Array.isArray(providedSalaries) && providedSalaries.length > 0) {
-            const total = providedSalaries.reduce((s, x) => s + Number(x.salary || 0), 0);
+            // Get existing DB workers to calculate profileDebit from their stored entries
+            const existingWorkersForProvided = await WorkerSalaryCollection.find({ project_id: projectId }).toArray();
+            const totalEntriesForProvided = existingWorkersForProvided.reduce((sum, w) => {
+                return sum + (Number(w.no_of_entries) || 0);
+            }, 0);
+            const profileDebitForProvided = totalEntriesForProvided * (project.profile_price_per_entry ?? 0);
             for (const { worker, salary } of providedSalaries) {
                 const existing = await WorkerSalaryCollection.findOne({ worker_name: worker, project_id: projectId });
                 if (existing && typeof existing.profile_debit === 'string') {
                     const parsed = Number(existing.profile_debit);
                     await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { profile_debit: isNaN(parsed) ? 0 : parsed } });
                 }
-                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: total } }, { upsert: true });
+                await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: profileDebitForProvided } }, { upsert: true });
             }
+            // Stamp correct profile_debit on ALL worker rows for this project
+            await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebitForProvided } });
             await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
             return res.json({ success: true, message: 'Single entry project approved (from provided salaries)' });
         }
         // Otherwise, attempt the original ProjectData-driven flow
         const projectData = (await ProjectData.findOne({ project_id: projectId }));
         if (!projectData) {
-            return res.status(400).json({ success: false, message: 'Project data not available for single-entry approval. Provide salaries in request body as { salaries: [{ worker, salary }] }.' });
+            return res.status(400).json({
+                success: false,
+                message: 'Project data not available for single-entry approval. Provide salaries in request body as { salaries: [{ worker, salary }] }.'
+            });
         }
         const users = await user_1.default.find({}, { name: 1 });
         const userMap = {};
         users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
         const salaries = {};
         const entryCounts = {};
+        // Sheet always contains ALL rows — so entryCounts will be complete for all workers
         projectData.row_data.forEach((row) => {
             const raw = row[row.length - 1];
             if (!raw)
@@ -2412,13 +2423,18 @@ const approveSingleEntryProject = async (req, res) => {
                 entryCounts[real] = (entryCounts[real] || 0) + 1;
             });
         });
+        // ✅ Sheet has ALL rows so entryCounts is already complete — no DB merge needed
         const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
         const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
         // If the project is already completed (treated as paid), create payroll adjustments
-        // instead of directly overwriting workersalaries.
         if (project.status === "completed") {
             try {
-                await (0, payrollController_1.applyRevisionInternal)({ projectId, reason: 'Approved via admin (single-entry)', applyMode: 'applied', created_by: req?.user?.name || null });
+                await (0, payrollController_1.applyRevisionInternal)({
+                    projectId,
+                    reason: 'Approved via admin (single-entry)',
+                    applyMode: 'applied',
+                    created_by: req?.user?.name || null
+                });
                 await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
                 return res.json({ success: true, message: 'Single entry project approved and adjustments created (project already completed)' });
             }
@@ -2447,6 +2463,8 @@ const approveSingleEntryProject = async (req, res) => {
                 }
             }
         }
+        // ✅ Stamp correct profile_debit on ALL worker rows — including workers not in current sync
+        await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebit } });
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({ success: true, message: "Single entry project approved" });
     }
