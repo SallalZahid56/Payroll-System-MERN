@@ -2502,16 +2502,26 @@ export const getCompletedProjects = async (req: Request, res: Response) => {
 };
 
 
-/* -------------------- 🔹 Update a completed project (inline edit) -------------------- */
 export const updateCompletedProject = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { project_name, sheet_name, total_entries } = req.body;
+    const {
+      project_name,
+      profile_name,
+      sheet_name,
+      total_entries,
+      project_type,
+      fixed_option,
+      lumpsum_price,
+      price_worker_one,
+      price_worker_two,
+      shift,
+    } = req.body;
 
-    if (!project_name || !sheet_name || total_entries === undefined || total_entries === null) {
+    if (!project_name || !profile_name || !sheet_name || total_entries === undefined || total_entries === null) {
       return res.status(400).json({
         success: false,
-        message: "project_name, sheet_name and total_entries are required",
+        message: "project_name, profile_name, sheet_name and total_entries are required",
       });
     }
 
@@ -2523,9 +2533,31 @@ export const updateCompletedProject = async (req: Request, res: Response) => {
       });
     }
 
+    const numericInputs: Record<string, unknown> = { lumpsum_price, price_worker_one, price_worker_two };
+    const parsedNumeric: Record<string, number> = {};
+    for (const [key, value] of Object.entries(numericInputs)) {
+      const parsed = value === undefined || value === null || value === "" ? 0 : Number(value);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${key} must be a valid non-negative number`,
+        });
+      }
+      parsedNumeric[key] = parsed;
+    }
+
     const updatedProject = await Project.findByIdAndUpdate(
       id,
-      { project_name, sheet_name, total_entries: parsedTotalEntries },
+      {
+        project_name,
+        profile_name,
+        sheet_name,
+        total_entries: parsedTotalEntries,
+        project_type: project_type ?? "",
+        fixed_option: fixed_option ?? "",
+        shift: shift ?? "",
+        ...parsedNumeric,
+      },
       { new: true, runValidators: true }
     );
 
