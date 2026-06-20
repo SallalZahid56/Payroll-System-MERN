@@ -1285,7 +1285,7 @@ export const getUserPayroll = async (req: Request, res: Response) => {
                 }
               }
             }
-          ],
+          ], 
           as: "rws"
         }
       },

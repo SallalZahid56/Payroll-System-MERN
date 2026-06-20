@@ -1754,7 +1754,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     fixed_profile_debit: { $sum: "$net_fixed_debit" },
                 },
             },
-        ]).toArray();
+        ]).toArray(); 
         /* ================= HOURLY PAYROLL (NON-BWP) ================= */
         const hourly = await HourlyRecords.aggregate([
             {

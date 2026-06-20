@@ -428,4 +428,4 @@ export default function CompletedProjectsTable() {
             <RevisionPreviewModal projectId={modalProjectId} isOpen={modalOpen} onClose={closeModal} onApplied={() => fetchCompletedProjects(selectedProject)} />
         </div>
     );
-}
+} 
