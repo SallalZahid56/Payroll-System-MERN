@@ -2182,6 +2182,7 @@ const getSubmittedProjects = async (req, res) => {
     }
 };
 exports.getSubmittedProjects = getSubmittedProjects;
+
 // Get completed projects with optional filters
 const getCompletedProjects = async (req, res) => {
     try {
