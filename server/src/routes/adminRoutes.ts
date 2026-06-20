@@ -35,7 +35,9 @@ import {
   getCompanies,
   getCompanyPayroll,
   getSubmittedProjects,
-  getCompletedProjects, getCompletedProjectNames,
+  getCompletedProjects,
+  getCompletedProjectNames,
+  updateCompletedProject,
   getPendingRevisions,
   getDeletableProjectNames,
   getDeletableProjects,
@@ -102,6 +104,7 @@ router.get("/companies", getCompanies);
 router.get("/payroll-company/:company", getCompanyPayroll);
 router.get("/submitted-projects", getSubmittedProjects);
 router.get("/get-completed-projects", getCompletedProjects);
+router.put("/update-completed-project/:id", updateCompletedProject);
 router.get("/get-completed-project-names", getCompletedProjectNames);
 router.get("/get-pending-revisions", getPendingRevisions);
 router.get("/get-deletable-project-names", getDeletableProjectNames);

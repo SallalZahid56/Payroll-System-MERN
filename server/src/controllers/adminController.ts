@@ -620,7 +620,7 @@ export const assignProject = async (req: Request, res: Response) => {
 
 
 
-/* -------------------- 🔹 Get Assigned Projects -------------------- */
+
 /* -------------------- 🔹 Get Assigned Projects -------------------- */
 export const getAssignedProjects = async (_req: Request, res: Response) => {
   try {
@@ -2498,6 +2498,48 @@ export const getCompletedProjects = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Error fetching completed projects:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+/* -------------------- 🔹 Update a completed project (inline edit) -------------------- */
+export const updateCompletedProject = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { project_name, sheet_name, total_entries } = req.body;
+
+    if (!project_name || !sheet_name || total_entries === undefined || total_entries === null) {
+      return res.status(400).json({
+        success: false,
+        message: "project_name, sheet_name and total_entries are required",
+      });
+    }
+
+    const parsedTotalEntries = Number(total_entries);
+    if (Number.isNaN(parsedTotalEntries) || parsedTotalEntries < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "total_entries must be a valid non-negative number",
+      });
+    }
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      id,
+      { project_name, sheet_name, total_entries: parsedTotalEntries },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedProject) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    res.json({ success: true, project: updatedProject });
+  } catch (err: any) {
+    console.error("Error updating completed project:", err);
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: "Project name already exists" });
+    }
+    res.status(500).json({ success: false, message: "Error updating completed project" });
   }
 };
 

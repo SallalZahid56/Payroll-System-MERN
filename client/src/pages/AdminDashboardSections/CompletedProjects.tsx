@@ -3,6 +3,7 @@ import axios from "../../utils/axios";
 import RevisionPreviewModal from "../../components/RevisionPreviewModal";
 
 interface CompletedProject {
+    _id: string;
     project_id: string;
     project_name: string;
     profile_name: string;
@@ -18,6 +19,12 @@ interface CompletedProject {
     revised?: boolean;
 }
 
+interface EditData {
+    project_name: string;
+    sheet_name: string;
+    total_entries: number | string;
+}
+
 export default function CompletedProjectsTable() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
@@ -28,7 +35,12 @@ export default function CompletedProjectsTable() {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalProjectId, setModalProjectId] = useState<string | null>(null);
 
-    // Fetch all project names for dropdown
+    // Inline edit state
+    const [editRowId, setEditRowId] = useState<string | null>(null);
+    const [editData, setEditData] = useState<EditData>({ project_name: "", sheet_name: "", total_entries: "" });
+    const [saving, setSaving] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+
     useEffect(() => {
         const fetchNames = async () => {
             try {
@@ -68,6 +80,48 @@ export default function CompletedProjectsTable() {
     const closeModal = () => {
         setModalOpen(false);
         setModalProjectId(null);
+    };
+
+    const handleEditClick = (p: CompletedProject) => {
+        setEditRowId(p._id);
+        setEditData({
+            project_name: p.project_name,
+            sheet_name: p.sheet_name,
+            total_entries: p.total_entries,
+        });
+        setEditError(null);
+    };
+
+    const handleCancelEdit = () => {
+        setEditRowId(null);
+        setEditError(null);
+    };
+
+    const handleSaveEdit = async (id: string) => {
+        if (!editData.project_name.trim() || !editData.sheet_name.trim() || editData.total_entries === "") {
+            setEditError("All fields are required");
+            return;
+        }
+        try {
+            setSaving(true);
+            setEditError(null);
+            await axios.put(`/admin/update-completed-project/${id}`, {
+                project_name: editData.project_name,
+                sheet_name: editData.sheet_name,
+                total_entries: Number(editData.total_entries),
+            });
+            setEditRowId(null);
+            await fetchCompletedProjects(selectedProject);
+        } catch (err) {
+            console.error("Failed to update project", err);
+            const message =
+                err instanceof Error && "response" in err
+                    ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+                    : undefined;
+            setEditError(message || "Failed to save changes");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -116,6 +170,12 @@ export default function CompletedProjectsTable() {
                 </button>
             </div>
 
+            {editError && (
+                <div className="mb-4 px-4 py-2 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+                    {editError}
+                </div>
+            )}
+
             {/* Table */}
             <div className="relative w-full overflow-x-auto border rounded-lg">
                 {projects.length === 0 ? (
@@ -151,48 +211,106 @@ export default function CompletedProjectsTable() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {projects.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-purple-50">
-                                        <td className="px-4 py-2">{p.project_id}</td>
-                                        <td className="px-4 py-2">{p.project_name}</td>
-                                        <td className="px-4 py-2">{p.profile_name}</td>
-                                        <td className="px-4 py-2">{p.sheet_name}</td>
-                                        <td className="px-4 py-2">{p.total_entries}</td>
-                                        <td className="px-4 py-2">{p.project_type ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.fixed_option ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.price_per_entry ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.lumpsum_price ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.price_worker_one ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.price_worker_two ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.shift ?? "—"}</td>
-                                        <td className="px-4 py-2">{p.revised ? "Yes" : "No"}</td>
-                                        <td className="px-4 py-2">
-                                            <div className="flex gap-2">
-                                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                                                    Edit
-                                                </button>
-                                                <button onClick={() => openModal(p.project_id)} className="px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700">
-                                                    Revision
-                                                </button>
-                                                <button
-                                                    onClick={async () => {
-                                                        if (!confirm('Set this completed project back to pending for revision?')) return;
-                                                        try {
-                                                            await axios.post('/admin/mark-project-pending-for-revision', { projectId: p.project_id, reason: 'Marked from Completed UI' });
-                                                            fetchCompletedProjects(selectedProject);
-                                                        } catch (err) {
-                                                            console.error('Failed to set pending for revision', err);
-                                                            alert('Failed to set project to pending for revision');
-                                                        }
-                                                    }}
-                                                    className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                                                >
-                                                    Set Pending
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {projects.map((p) => {
+                                    const isEditing = p._id === editRowId;
+                                    return (
+                                        <tr key={p._id} className="hover:bg-purple-50">
+                                            <td className="px-4 py-2">{p.project_id}</td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        className="border rounded px-2 py-1 w-40"
+                                                        value={editData.project_name}
+                                                        onChange={e => setEditData({ ...editData, project_name: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.project_name
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">{p.profile_name}</td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        className="border rounded px-2 py-1 w-40"
+                                                        value={editData.sheet_name}
+                                                        onChange={e => setEditData({ ...editData, sheet_name: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.sheet_name
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        className="border rounded px-2 py-1 w-24"
+                                                        value={editData.total_entries}
+                                                        onChange={e => setEditData({ ...editData, total_entries: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.total_entries
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">{p.project_type ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.fixed_option ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.price_per_entry ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.lumpsum_price ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.price_worker_one ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.price_worker_two ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.shift ?? "—"}</td>
+                                            <td className="px-4 py-2">{p.revised ? "Yes" : "No"}</td>
+                                            <td className="px-4 py-2">
+                                                <div className="flex gap-2">
+                                                    {isEditing ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleSaveEdit(p._id)}
+                                                                disabled={saving}
+                                                                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                                                            >
+                                                                {saving ? "Saving..." : "Save"}
+                                                            </button>
+                                                            <button
+                                                                onClick={handleCancelEdit}
+                                                                disabled={saving}
+                                                                className="px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500 disabled:opacity-50"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleEditClick(p)}
+                                                                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            <button onClick={() => openModal(p.project_id)} className="px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700">
+                                                                Revision
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm('Set this completed project back to pending for revision?')) return;
+                                                                    try {
+                                                                        await axios.post('/admin/mark-project-pending-for-revision', { projectId: p.project_id, reason: 'Marked from Completed UI' });
+                                                                        fetchCompletedProjects(selectedProject);
+                                                                    } catch (err) {
+                                                                        console.error('Failed to set pending for revision', err);
+                                                                        alert('Failed to set project to pending for revision');
+                                                                    }
+                                                                }}
+                                                                className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                                            >
+                                                                Set Pending
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

@@ -47,7 +47,7 @@ app.use(express.json());
 mongoose
   .connect(MONGO_URI)
   .then(() => {
-    console.log("✅ MongoDB connected successfully");
+    console.log(" MongoDB connected successfully");
 
     // Start automatic project data sync scheduler after DB connection
     startSyncScheduler();
