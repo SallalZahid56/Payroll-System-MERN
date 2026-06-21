@@ -551,7 +551,7 @@ const assignProject = async (req, res) => {
     }
 };
 exports.assignProject = assignProject;
-/* -------------------- 🔹 Get Assigned Projects -------------------- */
+
 /* -------------------- 🔹 Get Assigned Projects -------------------- */
 const getAssignedProjects = async (_req, res) => {
     try {
@@ -666,13 +666,14 @@ const updateProject = async (req, res) => {
     }
 };
 exports.updateProject = updateProject;
+
 /* -------------------- 🔹 Get All Hourly Unassigned Projects -------------------- */
 const getHourlyUnassignedProjects = async (_req, res) => {
     try {
         const projects = await Project_1.default.find({
-            assigned_to: { $in: [null, ""] }, // 🔥 unassigned
-            status: "pending", // 🔥 only pending
-            project_type: "hourly", // 🔥 only hourly
+            assigned_to: { $in: [null, ""] },
+            status: "pending",
+            project_type: "hourly",
         })
             .sort({ created_at: -1 })
             .lean();
@@ -685,16 +686,17 @@ const getHourlyUnassignedProjects = async (_req, res) => {
         res.json({ success: true, projects: parsedProjects });
     }
     catch (err) {
-        console.error("❌ Error fetching hourly unassigned projects (ADMIN):", err);
+        console.error("Error fetching hourly unassigned projects (ADMIN):", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 exports.getHourlyUnassignedProjects = getHourlyUnassignedProjects;
+
 /* -------------------- 🔹 Get Hourly Assigned Projects -------------------- */
 const getHourlyAssignedProjects = async (_req, res) => {
     try {
         const projects = await Project_1.default.find({
-            assigned_to: { $nin: ["", null] }, // assigned
+            assigned_to: { $nin: ["", null] },
             project_type: "hourly",
             status: "assigned",
             price_per_hour: { $ne: null },
@@ -702,18 +704,19 @@ const getHourlyAssignedProjects = async (_req, res) => {
         res.json({ success: true, projects });
     }
     catch (err) {
-        console.error("❌ Error fetching hourly assigned projects:", err);
+        console.error("Error fetching hourly assigned projects:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 exports.getHourlyAssignedProjects = getHourlyAssignedProjects;
+
 /* -------------------- 🔹 Update Hourly Project -------------------- */
 const updateHourlyProject = async (req, res) => {
     try {
         const projectId = req.params.id;
         const allowedFields = ["project_name", "profile_name", "sheet_name", "project_type", "price_per_hour"];
         const updateData = {};
-        // Only allow updating these fields
+        
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {
                 updateData[key] = req.body[key];
@@ -731,6 +734,7 @@ const updateHourlyProject = async (req, res) => {
     }
 };
 exports.updateHourlyProject = updateHourlyProject;
+
 // Get project details for Go to Project button
 const getProjectDetails = async (req, res) => {
     const { projectId } = req.params;
@@ -757,6 +761,7 @@ const getProjectDetails = async (req, res) => {
     }
 };
 exports.getProjectDetails = getProjectDetails;
+
 // Update project status when clicking Go to Project
 const updateProjectStatus = async (req, res) => {
     const { projectId } = req.params;
@@ -777,11 +782,11 @@ const updateProjectStatus = async (req, res) => {
     }
 };
 exports.updateProjectStatus = updateProjectStatus;
+
 // For go to project button to write columns
 const writeProjectColumns = async (req, res) => {
     try {
         const projectId = req.params.projectId;
-        // Fetch project
         const project = await Project_1.default.findOne({ project_id: projectId });
         if (!project) {
             return res.status(404).json({ success: false, message: "Project not found." });
@@ -789,7 +794,6 @@ const writeProjectColumns = async (req, res) => {
         if (!project.google_sheet_url) {
             return res.status(400).json({ success: false, message: "Google Sheet URL missing." });
         }
-        // Extract spreadsheet ID
         const spreadsheetId = project.google_sheet_url.split("/d/")[1]?.split("/")[0];
         if (!spreadsheetId) {
             return res.status(400).json({ success: false, message: "Invalid Google Sheet URL." });
@@ -799,7 +803,7 @@ const writeProjectColumns = async (req, res) => {
         const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
         const sheetsList = sheetMeta.data.sheets ?? [];
         const tabName = project.project_name?.trim() || "";
-        // Debug logs to help match sheets when titles differ slightly
+
         console.log('Looking for tabName:', tabName);
         console.log('Available sheets:', sheetsList.map((s) => s.properties?.title));
         console.log('Normalized sheet titles:', sheetsList.map((s) => String(s.properties?.title || '').replace(/[^\w\s]/g, '').trim().toLowerCase()));
@@ -821,11 +825,10 @@ const writeProjectColumns = async (req, res) => {
         if (!sheetObj || !sheetObj.properties || sheetObj.properties.sheetId === undefined) {
             return res.status(400).json({
                 success: false,
-                message: `❌ Tab "${tabName}" not found in Google Sheet.`,
+                message: `Tab "${tabName}" not found in Google Sheet.`,
             });
         }
         const sheetId = sheetObj.properties.sheetId;
-        // Only NON-file-based fixed projects allowed
         if (project.is_file_based) {
             return res.status(400).json({
                 success: false,
@@ -838,6 +841,7 @@ const writeProjectColumns = async (req, res) => {
                 message: "Only fixed-type projects are handled.",
             });
         }
+
         // ----------------------- NORMALIZATION HELPER -----------------------
         const normalize = (str) => str.trim().toLowerCase();
         // ----------------------- WORKER COLUMN MAP -----------------------
@@ -849,19 +853,19 @@ const writeProjectColumns = async (req, res) => {
             "Fifth Entry": ["Worker One", "Worker Two", "Worker Three", "Worker Four", "Worker Five"],
         };
         const workerColumns = workerMap[project.fixed_option || ""] ?? [];
-        // Read existing header
+
         const headerResp = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: `${tabName}!A1:BZ1`,
         });
         const existingHeader = headerResp.data.values?.[0] ?? [];
         const finalHeader = [...existingHeader];
-        // Create lowercase version for comparison
         const finalHeaderNormalized = finalHeader.map((h) => normalize(h));
+
         // ----------------------- ADD MISSING WORKER COLUMNS -----------------------
         for (const col of workerColumns) {
             if (!finalHeaderNormalized.includes(normalize(col))) {
-                finalHeader.push(col); // Add at the end
+                finalHeader.push(col);
             }
         }
         // If headers already match (no change)
@@ -871,6 +875,7 @@ const writeProjectColumns = async (req, res) => {
                 message: "Header already aligned — no changes required.",
             });
         }
+
         // ----------------------- UPDATE ONLY HEADER ROW -----------------------
         await sheets.spreadsheets.values.update({
             spreadsheetId,
@@ -878,6 +883,7 @@ const writeProjectColumns = async (req, res) => {
             valueInputOption: "RAW",
             requestBody: { values: [finalHeader] },
         });
+
         // ----------------------- STYLE HEADER ROW -----------------------
         await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
@@ -900,11 +906,11 @@ const writeProjectColumns = async (req, res) => {
         });
         return res.json({
             success: true,
-            message: `✅ Sheet "${tabName}" is ready — worker columns ensured.`,
+            message: `Sheet "${tabName}" is ready — worker columns ensured.`,
         });
     }
     catch (err) {
-        console.error("❌ Error in writeProjectColumns:", err);
+        console.error("Error in writeProjectColumns:", err);
         return res.status(500).json({
             success: false,
             message: "Internal server error while writing to sheet.",
@@ -912,7 +918,7 @@ const writeProjectColumns = async (req, res) => {
     }
 };
 exports.writeProjectColumns = writeProjectColumns;
-// server/src/controllers/adminController.ts
+
 // ----------------- Sync service: syncAllProjects -----------------
 const syncAllProjects = async () => {
     try {
@@ -920,20 +926,20 @@ const syncAllProjects = async () => {
         // Find projects that are "In Work" in sheet_status (matches your MySQL logic)
         const inWorkProjects = await Project_1.default.find({ sheet_status: "In Work" }).select("project_id project_name google_sheet_url").lean();
         if (!inWorkProjects || inWorkProjects.length === 0) {
-            console.log("⚠️ No active projects found for sync.");
+            console.log("No active projects found for sync.");
             return { success: false, message: "No active projects found." };
         }
         for (const proj of inWorkProjects) {
             const { project_id, google_sheet_url, project_name } = proj;
             if (!google_sheet_url) {
-                console.log(`⚠️ Project ${project_id} has no google_sheet_url — skipping.`);
+                console.log(`Project ${project_id} has no google_sheet_url — skipping.`);
                 continue;
             }
-            console.log(`📂 Processing project: ${project_id} (${project_name})`);
+            console.log(`Processing project: ${project_id} (${project_name})`);
             // extract spreadsheetId
             const spreadsheetId = (google_sheet_url || "").split("/d/")[1]?.split("/")[0];
             if (!spreadsheetId) {
-                console.log(`⚠️ Invalid sheet URL for project ${project_id}. Skipping.`);
+                console.log(`Invalid sheet URL for project ${project_id}. Skipping.`);
                 continue;
             }
             // Get sheet metadata
@@ -945,10 +951,10 @@ const syncAllProjects = async () => {
             // Find matching tab by normalized name (case-insensitive trim)
             const matchedTab = tabNames.find((name) => (name || "").trim().toLowerCase() === normalizedProjectName);
             if (!matchedTab) {
-                console.log(`⚠️ Skipping project ${project_id}: No tab found matching project name "${project_name}".`);
+                console.log(`Skipping project ${project_id}: No tab found matching project name "${project_name}".`);
                 continue;
             }
-            console.log(`📑 Found matching tab: ${matchedTab}`);
+            console.log(`Found matching tab: ${matchedTab}`);
             // Read full area (header + rows)
             const sheetResponse = await sheetsClient.spreadsheets.values.get({
                 spreadsheetId,
@@ -957,7 +963,8 @@ const syncAllProjects = async () => {
             const sheetData = sheetResponse.data.values || [];
             const sheetHeaders = sheetData[0] || [];
             const sheetRows = sheetData.slice(1);
-            console.log(`📊 [${matchedTab}] Sheet has ${sheetRows.length} rows.`);
+            console.log(`[${matchedTab}] Sheet has ${sheetRows.length} rows.`);
+
             // Get existing saved data from MongoDB
             const existing = (await ProjectData.findOne({ project_id }).lean());
             let dbDataArray = [];
@@ -966,7 +973,6 @@ const syncAllProjects = async () => {
             }
             const dbHeaders = dbDataArray[0] || [];
             const dbRows = dbDataArray.slice(1);
-            // Compare — count changes
             let changesFound = 0;
             const maxRows = Math.max(sheetRows.length, dbRows.length);
             for (let i = 0; i < maxRows; i++) {
@@ -988,17 +994,17 @@ const syncAllProjects = async () => {
                 const finalDataToSave = [sheetHeaders, ...sheetRows];
                 // Upsert into ProjectData
                 await ProjectData.findOneAndUpdate({ project_id }, { project_id, row_data: finalDataToSave, updated_at: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true });
-                console.log(`💾 DB updated for project ${project_id}. Detected ${changesFound} changed cell(s).`);
+                console.log(`DB updated for project ${project_id}. Detected ${changesFound} changed cell(s).`);
             }
             else {
-                console.log(`✅ No changes for project ${project_id}. DB is in sync.`);
+                console.log(`No changes for project ${project_id}. DB is in sync.`);
             }
         }
-        console.log("✅ Project data sync completed.");
+        console.log("Project data sync completed.");
         return { success: true, message: "Project data synchronized successfully." };
     }
     catch (err) {
-        console.error("❌ Error syncing project data:", err);
+        console.error("Error syncing project data:", err);
         return { success: false, message: "Failed to sync project data." };
     }
 };
@@ -1011,6 +1017,7 @@ const syncProjectDataController = async (req, res) => {
     return res.status(500).json({ success: false, message: result.message });
 };
 exports.syncProjectDataController = syncProjectDataController;
+
 // GET ALL USERS EXCEPT ADMIN
 const getUsersProfiles = async (req, res) => {
     try {
@@ -1032,6 +1039,7 @@ const getUsersProfiles = async (req, res) => {
     }
 };
 exports.getUsersProfiles = getUsersProfiles;
+
 // This is for user payroll
 const getUserPayroll = async (req, res) => {
     try {
@@ -1049,20 +1057,19 @@ const getUserPayroll = async (req, res) => {
                 message: "Start date and end date are required.",
             });
         }
+
         // ---------------------
         // Convert dates, set end-of-day
         // ---------------------
         const start = new Date(start_date);
         const end = new Date(end_date);
         end.setHours(23, 59, 59, 999);
+
         // ---------------------
         // Collections
         // ---------------------
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
-        // Build a tolerant regex pattern from the selected username that ignores
-        // extra whitespace/punctuation and is case-insensitive. This helps match
-        // stored worker_name variations like extra spaces, dashes or commas.
         const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const nameWords = selectedUsername.split(/\W+/).filter(Boolean);
         const namePattern = nameWords.length
@@ -1091,7 +1098,6 @@ const getUserPayroll = async (req, res) => {
             },
             { $unwind: "$ws" },
             {
-                // tolerant username match (ignores punctuation/extra spaces, case-insensitive)
                 $match: { "ws.worker_name": { $regex: namePattern, $options: "i" } }
             },
             {
@@ -1193,6 +1199,7 @@ const getUserPayroll = async (req, res) => {
     }
 };
 exports.getUserPayroll = getUserPayroll;
+
 // -------------------- 🔹 Fetch only profiles for the dropdown --------------------
 const getProfilesForDropDown = async (req, res) => {
     try {
@@ -1212,6 +1219,7 @@ const getProfilesForDropDown = async (req, res) => {
     }
 };
 exports.getProfilesForDropDown = getProfilesForDropDown;
+
 // -------------------- 🔹 Fetch individual profile payroll --------------------
 const getProfilePayroll = async (req, res) => {
     try {
@@ -1229,7 +1237,6 @@ const getProfilePayroll = async (req, res) => {
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
         const WorkerSalaries = db.collection("workersalaries");
-        // ---------------- Fixed Project Payroll ----------------
         const fixedPipeline = [
             { $match: { status: "completed", profile_name: profileName, updated_at: { $gte: start, $lte: end } } },
             { $lookup: { from: "workersalaries", localField: "project_id", foreignField: "project_id", as: "ws" } },
@@ -1258,6 +1265,7 @@ const getProfilePayroll = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
+
         // ---------------- Hourly Project Payroll ----------------
         const hourlyPipeline = [
             { $match: { profile_name: profileName, updated_at: { $gte: start, $lte: end } } },
@@ -1280,6 +1288,7 @@ const getProfilePayroll = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const hourlyResults = await Hourly.aggregate(hourlyPipeline).toArray();
+
         // ---------------- Combine Fixed + Hourly (unique project_id) ----------------
         const combinedMap = {};
         [...fixedResults, ...hourlyResults].forEach((item) => {
@@ -1298,6 +1307,7 @@ const getProfilePayroll = async (req, res) => {
     }
 };
 exports.getProfilePayroll = getProfilePayroll;
+
 // -------------------- 🔹 Fetch ALL USERS payroll --------------------
 const getAllUsersPayroll = async (req, res) => {
     try {
@@ -1313,6 +1323,7 @@ const getAllUsersPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
+
         /* ================= FIXED PAYROLL ================= */
         const fixedResults = await Projects.aggregate([
             {
@@ -1330,7 +1341,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$ws" },
-            /* 🔹 Normalize numeric fields */
+
             {
                 $addFields: {
                     price_worker_one_num: {
@@ -1401,6 +1412,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= HOURLY PAYROLL ================= */
         const hourlyResults = await HourlyRecords.aggregate([
             {
@@ -1412,7 +1424,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$p" },
-            /* 🔹 Filter using PROJECT date (important) */
+            /* Filter using PROJECT date (important) */
             {
                 $match: {
                     "p.updated_at": { $gte: start, $lte: end },
@@ -1447,6 +1459,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= COMBINE ================= */
         const payrollMap = new Map();
         fixedResults.forEach((r) => {
@@ -1497,6 +1510,7 @@ const getAllUsersPayroll = async (req, res) => {
     }
 };
 exports.getAllUsersPayroll = getAllUsersPayroll;
+
 // -------------------- 🔹 Fetch ALL PROFILES payroll --------------------
 const getAllProfilesPayroll = async (req, res) => {
     try {
@@ -1512,6 +1526,7 @@ const getAllProfilesPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
+
         /* ================= FIXED PAYROLL ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1529,7 +1544,6 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$ws" },
-            /* 🔹 Normalize values */
             {
                 $addFields: {
                     profile_debit_num: {
@@ -1550,7 +1564,6 @@ const getAllProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-            /* 🔹 FIRST GROUP: profile + project (MYSQL EQUIVALENT) */
             {
                 $group: {
                     _id: {
@@ -1558,11 +1571,11 @@ const getAllProfilesPayroll = async (req, res) => {
                         project_id: "$project_id",
                     },
                     profile_name: { $first: "$profile_name" },
-                    fixed_profile_debit: { $first: "$profile_debit_num" }, // ✅ ANY_VALUE
+                    fixed_profile_debit: { $first: "$profile_debit_num" },
                     fixed_entries: { $sum: "$entries_num" },
                 },
             },
-            /* 🔹 SECOND GROUP: per profile */
+
             {
                 $group: {
                     _id: "$profile_name",
@@ -1572,6 +1585,7 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= HOURLY PAYROLL ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1609,7 +1623,8 @@ const getAllProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-            /* 🔹 FIRST GROUP: profile + project */
+
+            /*FIRST GROUP: profile + project */
             {
                 $group: {
                     _id: {
@@ -1617,11 +1632,11 @@ const getAllProfilesPayroll = async (req, res) => {
                         project_id: "$project_id",
                     },
                     profile_name: { $first: "$p.profile_name" },
-                    hourly_profile_debit: { $first: "$profile_debit_num" }, // ✅ ANY_VALUE
+                    hourly_profile_debit: { $first: "$profile_debit_num" },
                     hourly_entries: { $sum: "$hours_num" },
                 },
             },
-            /* 🔹 SECOND GROUP: per profile */
+            /*SECOND GROUP: per profile */
             {
                 $group: {
                     _id: "$profile_name",
@@ -1631,6 +1646,7 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -1654,6 +1670,7 @@ const getAllProfilesPayroll = async (req, res) => {
             e.hourly_entries = h.hourly_entries;
             map.set(h.profile_name, e);
         });
+
         /* ================= FINAL TOTALS ================= */
         const final = Array.from(map.values()).map((e) => ({
             ...e,
@@ -1668,6 +1685,7 @@ const getAllProfilesPayroll = async (req, res) => {
     }
 };
 exports.getAllProfilesPayroll = getAllProfilesPayroll;
+
 // -------------------- 🔹 FILTERED PROFILES PAYROLL (RYK / NON-BWP) --------------------
 const getFilteredProfilesPayroll = async (req, res) => {
     try {
@@ -1684,6 +1702,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
         const targetCompany = "3 into 3";
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
+
         /* ================= FIXED PAYROLL (NON-BWP) ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1722,7 +1741,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-            /* 🔹 Group per project + profile */
+
             {
                 $group: {
                     _id: {
@@ -1738,7 +1757,8 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-            /* 🔹 Net debit (profile - BWP) */
+
+            /*Net debit (profile - BWP) */
             {
                 $addFields: {
                     net_fixed_debit: {
@@ -1746,7 +1766,8 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-            /* 🔹 Final per profile */
+
+            /*Final per profile */
             {
                 $group: {
                     _id: "$profile_name",
@@ -1755,6 +1776,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray(); 
+
         /* ================= HOURLY PAYROLL (NON-BWP) ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1823,6 +1845,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -1853,6 +1876,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
     }
 };
 exports.getFilteredProfilesPayroll = getFilteredProfilesPayroll;
+
 // -------------------- 🔹 FILTERED PROFILES PAYROLL (BWP) --------------------
 const getFilteredBWPProfilesPayroll = async (req, res) => {
     try {
@@ -1869,6 +1893,7 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
         const targetCompany = "3 into 3";
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
+
         /* ================= FIXED PAYROLL (BWP) ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1911,6 +1936,7 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= HOURLY PAYROLL (BWP) ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1953,6 +1979,7 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -1975,6 +2002,7 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
     }
 };
 exports.getFilteredBWPProfilesPayroll = getFilteredBWPProfilesPayroll;
+
 // -------------------- 🔹 GET COMPANIES FOR DROPDOWN --------------------
 const getCompanies = async (req, res) => {
     try {
@@ -1990,7 +2018,8 @@ const getCompanies = async (req, res) => {
     }
 };
 exports.getCompanies = getCompanies;
-// -------------------- 🔹 COMPANY PAYROLL --------------------
+
+// -------------------- COMPANY PAYROLL --------------------
 const getCompanyPayroll = async (req, res) => {
     try {
         const { company } = req.params;
@@ -2009,6 +2038,7 @@ const getCompanyPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
+
         /* ================= FIXED PROJECTS ================= */
         const fixed = await Projects.aggregate([
             {
@@ -2067,8 +2097,8 @@ const getCompanyPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
+
         /* ================= HOURLY PROJECTS ================= */
-        /* ================= HOURLY (NOW WORKS) ================= */
         const hourly = await Projects.aggregate([
             {
                 $match: {
@@ -2080,8 +2110,8 @@ const getCompanyPayroll = async (req, res) => {
             {
                 $lookup: {
                     from: "hourlyprojectrecords",
-                    localField: "project_id", // plain id
-                    foreignField: "project_id", // plain id
+                    localField: "project_id",
+                    foreignField: "project_id",
                     as: "hr",
                 },
             },
@@ -2126,13 +2156,13 @@ const getCompanyPayroll = async (req, res) => {
                 price_per_entry: prices.filter(Boolean).join(", "), // now lumpsum included
             };
         });
+
         /* ================= TOTALS ================= */
         const fixedSum = fixed.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const hourlySum = hourly.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const grandSum = fixedSum + hourlySum;
-        // Use fixedWithPrices (adds price_per_entry string) and combine with hourly
         const combinedData = [...fixedWithPrices, ...hourly];
-        // Sort combined results by numeric project_id when possible (ascending)
+
         combinedData.sort((a, b) => {
             const aNum = parseInt(String(a.project_id || "").replace(/\D/g, ""), 10);
             const bNum = parseInt(String(b.project_id || "").replace(/\D/g, ""), 10);
@@ -2142,7 +2172,6 @@ const getCompanyPayroll = async (req, res) => {
                 return -1;
             if (!isNaN(bNum))
                 return 1;
-            // Fallback to string compare
             return String(a.project_id || "").localeCompare(String(b.project_id || ""));
         });
         res.json({
@@ -2161,6 +2190,7 @@ const getCompanyPayroll = async (req, res) => {
     }
 };
 exports.getCompanyPayroll = getCompanyPayroll;
+
 /* ===========================
    GET SUBMITTED PROJECTS
 =========================== */
@@ -2174,7 +2204,7 @@ const getSubmittedProjects = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("❌ Error fetching submitted projects:", error);
+        console.error("Error fetching submitted projects:", error);
         res.status(500).json({
             success: false,
             message: "Failed to fetch submitted projects",
@@ -2206,6 +2236,7 @@ const getCompletedProjects = async (req, res) => {
     }
 };
 exports.getCompletedProjects = getCompletedProjects;
+
 // Get unique completed project names for dropdown
 const getCompletedProjectNames = async (req, res) => {
     try {
@@ -2218,6 +2249,7 @@ const getCompletedProjectNames = async (req, res) => {
     }
 };
 exports.getCompletedProjectNames = getCompletedProjectNames;
+
 // Get projects that are pending revision (marked revised and set back to pending)
 const getPendingRevisions = async (_req, res) => {
     try {
@@ -2230,6 +2262,7 @@ const getPendingRevisions = async (_req, res) => {
     }
 };
 exports.getPendingRevisions = getPendingRevisions;
+
 // -------------------------
 // Deletable Projects
 // -------------------------
