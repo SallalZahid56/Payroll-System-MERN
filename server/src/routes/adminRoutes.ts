@@ -120,15 +120,11 @@ router.post("/reject-project", rejectProject);
 router.post("/save-hourly-calculation", saveHourlyCalculation);
 router.post("/mark-project-completed", markProjectCompleted);
 router.post("/mark-project-pending-for-revision", markProjectPendingForRevision);
-
-// Payroll / Revisions
 router.post('/payroll-adjustments', createAdjustment);
 router.get('/payroll-adjustments', listAdjustments);
 router.post('/payroll-adjustments/:id/apply', markAdjustmentApplied);
-
 router.post('/payroll-runs', createPayrollRun);
 router.get('/payroll-runs', listPayrollRuns);
-
 router.post('/revisions/preview', previewRevision);
 router.post('/revisions', createProjectRevisionRecord);
 
