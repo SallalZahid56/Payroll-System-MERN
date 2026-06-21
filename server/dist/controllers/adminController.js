@@ -2283,6 +2283,7 @@ const getDeletableProjectNames = async (req, res) => {
     }
 };
 exports.getDeletableProjectNames = getDeletableProjectNames;
+
 const getDeletableProjects = async (req, res) => {
     try {
         const { start_date, end_date, project_id, project_name } = req.query;
@@ -2303,6 +2304,7 @@ const getDeletableProjects = async (req, res) => {
     }
 };
 exports.getDeletableProjects = getDeletableProjects;
+
 const deleteProject = async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -2311,7 +2313,6 @@ const deleteProject = async (req, res) => {
             console.error("MongoDB not connected");
             return res.status(500).json({ message: "Database not ready" });
         }
-        // Remove related hourly records and worker salaries and project data
         await dbInstance.collection("hourlyprojectrecords").deleteMany({ project_id: projectId });
         await dbInstance.collection("workersalaries").deleteMany({ project_id: projectId });
         await dbInstance.collection("project_data").deleteMany({ project_id: projectId });
@@ -2327,6 +2328,7 @@ const deleteProject = async (req, res) => {
     }
 };
 exports.deleteProject = deleteProject;
+
 // -------------------------
 // Project Expense
 // -------------------------
@@ -2344,6 +2346,7 @@ const getProjectsList = async (req, res) => {
     }
 };
 exports.getProjectsList = getProjectsList;
+
 const getProjectPayroll = async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -2357,9 +2360,7 @@ const getProjectPayroll = async (req, res) => {
             console.error("MongoDB not connected");
             return res.status(500).json({ success: false, message: "Database not ready" });
         }
-        // Fixed salaries (workersalaries)
         const fixed = await dbInst.collection("workersalaries").find({ project_id: projectId }).toArray();
-        // Hourly records
         const hourly = await dbInst.collection("hourlyprojectrecords").find({ project_id: projectId }).toArray();
         const fixedMapped = fixed.map((ws) => ({
             project_id: project.project_id,
@@ -2372,6 +2373,7 @@ const getProjectPayroll = async (req, res) => {
             profile_debit: ws.profile_debit ?? null,
             company: project.company ?? "",
         }));
+
         const hourlyMapped = hourly.map((h) => ({
             project_id: project.project_id,
             project_name: project.project_name,
@@ -2383,6 +2385,7 @@ const getProjectPayroll = async (req, res) => {
             profile_debit: null,
             company: project.company ?? "",
         }));
+
         const combined = [...fixedMapped, ...hourlyMapped];
         res.json({ success: true, data: combined });
     }
@@ -2392,6 +2395,7 @@ const getProjectPayroll = async (req, res) => {
     }
 };
 exports.getProjectPayroll = getProjectPayroll;
+
 // Approval Logic for projects
 const normalizeName = (name) => name
     ?.normalize("NFKD")
@@ -2399,6 +2403,7 @@ const normalizeName = (name) => name
     .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
     .replace(/[^a-z0-9]/gi, "")
     .toLowerCase();
+
 // Single Entry projects approval logic
 const approveSingleEntryProject = async (req, res) => {
     try {
@@ -2410,9 +2415,7 @@ const approveSingleEntryProject = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Project not found' });
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
-        // If client provided salaries explicitly, use them (useful when ProjectData isn't available)
         if (Array.isArray(providedSalaries) && providedSalaries.length > 0) {
-            // Get existing DB workers to calculate profileDebit from their stored entries
             const existingWorkersForProvided = await WorkerSalaryCollection.find({ project_id: projectId }).toArray();
             const totalEntriesForProvided = existingWorkersForProvided.reduce((sum, w) => {
                 return sum + (Number(w.no_of_entries) || 0);
@@ -2426,11 +2429,11 @@ const approveSingleEntryProject = async (req, res) => {
                 }
                 await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: profileDebitForProvided } }, { upsert: true });
             }
-            // Stamp correct profile_debit on ALL worker rows for this project
             await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebitForProvided } });
             await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
             return res.json({ success: true, message: 'Single entry project approved (from provided salaries)' });
         }
+
         // Otherwise, attempt the original ProjectData-driven flow
         const projectData = (await ProjectData.findOne({ project_id: projectId }));
         if (!projectData) {
@@ -2444,7 +2447,6 @@ const approveSingleEntryProject = async (req, res) => {
         users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
         const salaries = {};
         const entryCounts = {};
-        // Sheet always contains ALL rows — so entryCounts will be complete for all workers
         projectData.row_data.forEach((row) => {
             const raw = row[row.length - 1];
             if (!raw)
@@ -2457,7 +2459,8 @@ const approveSingleEntryProject = async (req, res) => {
                 entryCounts[real] = (entryCounts[real] || 0) + 1;
             });
         });
-        // ✅ Sheet has ALL rows so entryCounts is already complete — no DB merge needed
+
+        //Sheet has ALL rows so entryCounts is already complete — no DB merge needed
         const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
         const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
         // If the project is already completed (treated as paid), create payroll adjustments
@@ -2497,7 +2500,8 @@ const approveSingleEntryProject = async (req, res) => {
                 }
             }
         }
-        // ✅ Stamp correct profile_debit on ALL worker rows — including workers not in current sync
+
+        //Stamp correct profile_debit on ALL worker rows — including workers not in current sync
         await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebit } });
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({ success: true, message: "Single entry project approved" });
@@ -2507,7 +2511,9 @@ const approveSingleEntryProject = async (req, res) => {
         res.status(500).json({ success: false });
     }
 };
+
 exports.approveSingleEntryProject = approveSingleEntryProject;
+
 // Approve MultiEntry Projects Logic
 const approveMultiEntryProject = async (req, res) => {
     try {
@@ -2518,7 +2524,7 @@ const approveMultiEntryProject = async (req, res) => {
         if (!project || !projectData) {
             return res.status(404).json({ success: false, message: "Project not found" });
         }
-        // Determine number of entries based on project option
+
         const entryCountMap = {
             "Double Entry": 2,
             "Triple Entry": 3,
@@ -2529,7 +2535,7 @@ const approveMultiEntryProject = async (req, res) => {
         if (!numEntries) {
             return res.status(400).json({ success: false, message: "Invalid multi-entry option" });
         }
-        // Map worker column index → price
+
         const priceMap = [
             project.price_worker_one ?? 0,
             project.price_worker_two ?? 0,
@@ -2537,16 +2543,15 @@ const approveMultiEntryProject = async (req, res) => {
             project.price_worker_four ?? 0,
             project.price_worker_five ?? 0,
         ];
-        // Load users and create normalized map
+
         const users = await user_1.default.find({}, { name: 1 });
         const userMap = {};
         users.forEach(u => {
             userMap[normalizeName(u.name)] = u.name;
         });
-        // Initialize salary and entry counts
+
         const salaries = {};
         const entryCounts = {};
-        // Process each row safely
         if (Array.isArray(projectData.row_data) && projectData.row_data.length > 0) {
             const allRows = projectData.row_data;
             // Try to detect worker columns from header (first row saved by sync)
@@ -2561,7 +2566,6 @@ const approveMultiEntryProject = async (req, res) => {
             ].slice(0, numEntries);
             const workerIndices = workerColumnNames.map((w) => headerNormalized.indexOf((w || "").trim().toLowerCase()));
             const foundHeaderCols = workerIndices.some((idx) => idx >= 0);
-            // If header columns found, use those indices; otherwise fall back to previous "last N columns" approach
             if (foundHeaderCols) {
                 // iterate data rows (skip header)
                 for (let r = 1; r < allRows.length; r++) {
@@ -2573,7 +2577,6 @@ const approveMultiEntryProject = async (req, res) => {
                         const rawCell = row[colIndex];
                         if (!rawCell)
                             continue;
-                        // allow comma-separated names in a cell
                         const names = String(rawCell).split(",").map(s => s.trim()).filter(Boolean);
                         for (const name of names) {
                             const normalized = normalizeName(name);
@@ -2588,7 +2591,6 @@ const approveMultiEntryProject = async (req, res) => {
                 }
             }
             else {
-                // Fallback: use last `numEntries` columns of each row (legacy behavior)
                 allRows.forEach((row) => {
                     if (!row || !Array.isArray(row))
                         return;
@@ -2611,9 +2613,9 @@ const approveMultiEntryProject = async (req, res) => {
                 });
             }
         }
+
         // Calculate total profile debit
         const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
-        // If project already marked completed (treated as paid), create payroll adjustments
         if (project.status === "completed") {
             try {
                 await (0, payrollController_1.applyRevisionInternal)({ projectId, reason: 'Approved via admin (multi-entry)', applyMode: 'applied', created_by: req?.user?.name || null });
@@ -2627,7 +2629,6 @@ const approveMultiEntryProject = async (req, res) => {
         }
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
-        // Update salaries in DB
         for (const worker of Object.keys(salaries)) {
             const salary = salaries[worker];
             const entries = entryCounts[worker];
@@ -2662,7 +2663,6 @@ const approveMultiEntryProject = async (req, res) => {
                 }
             }
         }
-        // Mark project as completed
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({
             success: true,
@@ -2677,6 +2677,7 @@ const approveMultiEntryProject = async (req, res) => {
     }
 };
 exports.approveMultiEntryProject = approveMultiEntryProject;
+
 // Lumpsum Project Approval Logic
 const approveLumpsumProject = async (req, res) => {
     try {
@@ -2710,6 +2711,7 @@ const approveLumpsumProject = async (req, res) => {
     }
 };
 exports.approveLumpsumProject = approveLumpsumProject;
+
 // Reject a project
 const rejectProject = async (req, res) => {
     try {
@@ -2720,7 +2722,6 @@ const rejectProject = async (req, res) => {
                 message: "Project ID is required.",
             });
         }
-        // Find project
         const project = await Project_1.default.findOne({ project_id: projectId });
         if (!project) {
             return res.status(404).json({
@@ -2728,7 +2729,6 @@ const rejectProject = async (req, res) => {
                 message: "Project not found.",
             });
         }
-        // Reset project status and clear assignment
         project.status = "pending";
         project.assigned_to = "";
         project.assigned_to_ids = "";
@@ -2747,6 +2747,7 @@ const rejectProject = async (req, res) => {
     }
 };
 exports.rejectProject = rejectProject;
+
 // Update a payroll entry (project + worker salary row)
 const updatePayrollEntry = async (req, res) => {
     try {
@@ -2754,11 +2755,9 @@ const updatePayrollEntry = async (req, res) => {
         if (!project_id) {
             return res.status(400).json({ success: false, message: 'project_id is required' });
         }
-        // Fetch project
         const project = await Project_1.default.findOne({ project_id });
         if (!project)
             return res.status(404).json({ success: false, message: 'Project not found' });
-        // Update project-level fields if provided
         const projectUpdate = {};
         if (project_name !== undefined)
             projectUpdate.project_name = project_name;
@@ -2771,7 +2770,7 @@ const updatePayrollEntry = async (req, res) => {
         if (Object.keys(projectUpdate).length > 0) {
             await Project_1.default.updateOne({ project_id }, projectUpdate);
         }
-        // Update worker salary row in workersalaries collection
+
         const WorkerSalaryCollection = db.collection('workersalaries');
         const searchWorker = original_worker_name || worker_name;
         if (!searchWorker) {
@@ -2801,6 +2800,7 @@ const updatePayrollEntry = async (req, res) => {
     }
 };
 exports.updatePayrollEntry = updatePayrollEntry;
+
 // -------------------- 🔹 PAYROLL INFONAV BWP --------------------
 const getPayrollInfonavBwp = async (req, res) => {
     try {
@@ -2815,7 +2815,6 @@ const getPayrollInfonavBwp = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
-        // Fixed Projects: only BWP
         const fixedPipeline = [
             {
                 $match: {
@@ -2862,7 +2861,6 @@ const getPayrollInfonavBwp = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
-        // Hourly Projects: only BWP
         const hourlyPipeline = [
             {
                 $lookup: {
@@ -2913,6 +2911,7 @@ const getPayrollInfonavBwp = async (req, res) => {
     }
 };
 exports.getPayrollInfonavBwp = getPayrollInfonavBwp;
+
 // -------------------- 🔹 PAYROLL FZ BWP --------------------
 const getPayrollFzBwp = async (req, res) => {
     try {
@@ -2927,7 +2926,6 @@ const getPayrollFzBwp = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
-        // Fixed Projects: only BWP for freelancerszone
         const fixedPipeline = [
             {
                 $match: {
@@ -3025,6 +3023,7 @@ const getPayrollFzBwp = async (req, res) => {
     }
 };
 exports.getPayrollFzBwp = getPayrollFzBwp;
+
 /* -------------------- 🔹 Mark Project Completed -------------------- */
 const markProjectCompleted = async (req, res) => {
     try {
@@ -3044,6 +3043,7 @@ const markProjectCompleted = async (req, res) => {
     }
 };
 exports.markProjectCompleted = markProjectCompleted;
+
 // Mark project as pending for revision: snapshot current workersalaries and set project to pending
 const markProjectPendingForRevision = async (req, res) => {
     try {
@@ -3064,9 +3064,9 @@ const markProjectPendingForRevision = async (req, res) => {
             old_entries: Number(r.no_of_entries || 0),
             new_entries: Number(r.no_of_entries || 0),
         }));
+
         // Create a ProjectRevision snapshot record
         await projectRevision_1.default.create({ project_id: projectId, created_by: performedBy || null, summary: 'Snapshot before revision', worker_diffs, notes: reason || '' });
-        // Mark project as revised and pending
         project.is_revised = true;
         project.status = 'pending';
         if (!project.original_completed_at)
@@ -3079,4 +3079,5 @@ const markProjectPendingForRevision = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
 exports.markProjectPendingForRevision = markProjectPendingForRevision;
