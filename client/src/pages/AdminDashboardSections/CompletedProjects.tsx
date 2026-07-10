@@ -14,6 +14,10 @@ interface CompletedProject {
     lumpsum_price?: number;
     price_worker_one?: number;
     price_worker_two?: number;
+    price_worker_three?: number;
+    price_worker_four?: number;
+    price_worker_five?: number;
+    profile_price_per_entry?: number;
     shift?: string;
     revised?: boolean;
 }
@@ -28,6 +32,10 @@ interface EditData {
     lumpsum_price: number | string;
     price_worker_one: number | string;
     price_worker_two: number | string;
+    price_worker_three: number | string;
+    price_worker_four: number | string;
+    price_worker_five: number | string;
+    profile_price_per_entry: number | string;
     shift: string;
 }
 
@@ -41,6 +49,10 @@ const emptyEditData: EditData = {
     lumpsum_price: "",
     price_worker_one: "",
     price_worker_two: "",
+    price_worker_three: "",
+    price_worker_four: "",
+    price_worker_five: "",
+    profile_price_per_entry: "",
     shift: "",
 };
 
@@ -113,6 +125,10 @@ export default function CompletedProjectsTable() {
             lumpsum_price: p.lumpsum_price ?? 0,
             price_worker_one: p.price_worker_one ?? 0,
             price_worker_two: p.price_worker_two ?? 0,
+            price_worker_three: p.price_worker_three ?? 0,
+            price_worker_four: p.price_worker_four ?? 0,
+            price_worker_five: p.price_worker_five ?? 0,
+            profile_price_per_entry: p.profile_price_per_entry ?? 0,
             shift: p.shift ?? "",
         });
         setEditError(null);
@@ -146,6 +162,10 @@ export default function CompletedProjectsTable() {
                 lumpsum_price: editData.lumpsum_price === "" ? 0 : Number(editData.lumpsum_price),
                 price_worker_one: editData.price_worker_one === "" ? 0 : Number(editData.price_worker_one),
                 price_worker_two: editData.price_worker_two === "" ? 0 : Number(editData.price_worker_two),
+                price_worker_three: editData.price_worker_three === "" ? 0 : Number(editData.price_worker_three),
+                price_worker_four: editData.price_worker_four === "" ? 0 : Number(editData.price_worker_four),
+                price_worker_five: editData.price_worker_five === "" ? 0 : Number(editData.price_worker_five),
+                profile_price_per_entry: editData.profile_price_per_entry === "" ? 0 : Number(editData.profile_price_per_entry),
                 shift: editData.shift,
             });
             setEditRowId(null);
@@ -234,6 +254,10 @@ export default function CompletedProjectsTable() {
                                         "Lumpsum Price",
                                         "Price Worker One",
                                         "Price Worker Two",
+                                        "Price Worker Three",
+                                        "Price Worker Four",
+                                        "Price Worker Five",
+                                        "Profile Price Per Entry",
                                         "Shift",
                                         "Revised",
                                         "Edit",
@@ -354,6 +378,54 @@ export default function CompletedProjectsTable() {
                                                     />
                                                 ) : (
                                                     p.price_worker_two ?? "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        className="border rounded px-2 py-1 w-24"
+                                                        value={editData.price_worker_three}
+                                                        onChange={e => setEditData({ ...editData, price_worker_three: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.price_worker_three ?? "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        className="border rounded px-2 py-1 w-24"
+                                                        value={editData.price_worker_four}
+                                                        onChange={e => setEditData({ ...editData, price_worker_four: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.price_worker_four ?? "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        className="border rounded px-2 py-1 w-24"
+                                                        value={editData.price_worker_five}
+                                                        onChange={e => setEditData({ ...editData, price_worker_five: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.price_worker_five ?? "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        className="border rounded px-2 py-1 w-24"
+                                                        value={editData.profile_price_per_entry}
+                                                        onChange={e => setEditData({ ...editData, profile_price_per_entry: e.target.value })}
+                                                    />
+                                                ) : (
+                                                    p.profile_price_per_entry ?? "—"
                                                 )}
                                             </td>
                                             <td className="px-4 py-2">

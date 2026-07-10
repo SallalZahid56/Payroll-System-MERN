@@ -2515,6 +2515,10 @@ export const updateCompletedProject = async (req: Request, res: Response) => {
       lumpsum_price,
       price_worker_one,
       price_worker_two,
+      price_worker_three,
+      price_worker_four,
+      price_worker_five,
+      profile_price_per_entry,
       shift,
     } = req.body;
 
@@ -2533,7 +2537,15 @@ export const updateCompletedProject = async (req: Request, res: Response) => {
       });
     }
 
-    const numericInputs: Record<string, unknown> = { lumpsum_price, price_worker_one, price_worker_two };
+    const numericInputs: Record<string, unknown> = {
+      lumpsum_price,
+      price_worker_one,
+      price_worker_two,
+      price_worker_three,
+      price_worker_four,
+      price_worker_five,
+      profile_price_per_entry,
+    };
     const parsedNumeric: Record<string, number> = {};
     for (const [key, value] of Object.entries(numericInputs)) {
       const parsed = value === undefined || value === null || value === "" ? 0 : Number(value);
