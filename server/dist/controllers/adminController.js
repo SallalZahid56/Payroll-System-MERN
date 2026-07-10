@@ -3,8 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updatePayrollEntry = exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getPendingRevisions = exports.getCompletedProjectNames = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
-exports.markProjectPendingForRevision = exports.markProjectCompleted = exports.getPayrollFzBwp = exports.getPayrollInfonavBwp = void 0;
+exports.rejectProject = exports.approveLumpsumProject = exports.approveMultiEntryProject = exports.approveSingleEntryProject = exports.getProjectPayroll = exports.getProjectsList = exports.deleteProject = exports.getDeletableProjects = exports.getDeletableProjectNames = exports.getPendingRevisions = exports.getCompletedProjectNames = exports.updateCompletedProject = exports.getCompletedProjects = exports.getSubmittedProjects = exports.getCompanyPayroll = exports.getCompanies = exports.getFilteredBWPProfilesPayroll = exports.getFilteredProfilesPayroll = exports.getAllProfilesPayroll = exports.getAllUsersPayroll = exports.getProfilePayroll = exports.getProfilesForDropDown = exports.getUserPayroll = exports.getUsersProfiles = exports.syncProjectDataController = exports.syncAllProjects = exports.writeProjectColumns = exports.updateProjectStatus = exports.getProjectDetails = exports.updateHourlyProject = exports.getHourlyAssignedProjects = exports.getHourlyUnassignedProjects = exports.updateProject = exports.getUnpricedAssignedProjects = exports.getUnpricedUnassignedProjects = exports.getAssignedProjects = exports.assignProject = exports.getUsersAndCoordinators = exports.getUnassignedProjects = exports.saveHourlyCalculation = exports.addHourlyProject = exports.getNextProjectValues = exports.getColumns = exports.getManagers = exports.getProfilesForForm = exports.addProject = exports.addUser = exports.updateUserRole = exports.deleteUser = exports.getUsers = void 0;
+exports.markProjectPendingForRevision = exports.markProjectCompleted = exports.getPayrollFzBwp = exports.getPayrollInfonavBwp = exports.updatePayrollEntry = void 0;
 const payrollController_1 = require("./payrollController");
 const Project_1 = __importDefault(require("../models/Project"));
 const projectRevision_1 = __importDefault(require("../models/projectRevision"));
@@ -551,7 +551,6 @@ const assignProject = async (req, res) => {
     }
 };
 exports.assignProject = assignProject;
-
 /* -------------------- 🔹 Get Assigned Projects -------------------- */
 const getAssignedProjects = async (_req, res) => {
     try {
@@ -666,14 +665,13 @@ const updateProject = async (req, res) => {
     }
 };
 exports.updateProject = updateProject;
-
 /* -------------------- 🔹 Get All Hourly Unassigned Projects -------------------- */
 const getHourlyUnassignedProjects = async (_req, res) => {
     try {
         const projects = await Project_1.default.find({
-            assigned_to: { $in: [null, ""] },
-            status: "pending",
-            project_type: "hourly",
+            assigned_to: { $in: [null, ""] }, // 🔥 unassigned
+            status: "pending", // 🔥 only pending
+            project_type: "hourly", // 🔥 only hourly
         })
             .sort({ created_at: -1 })
             .lean();
@@ -686,17 +684,16 @@ const getHourlyUnassignedProjects = async (_req, res) => {
         res.json({ success: true, projects: parsedProjects });
     }
     catch (err) {
-        console.error("Error fetching hourly unassigned projects (ADMIN):", err);
+        console.error("❌ Error fetching hourly unassigned projects (ADMIN):", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 exports.getHourlyUnassignedProjects = getHourlyUnassignedProjects;
-
 /* -------------------- 🔹 Get Hourly Assigned Projects -------------------- */
 const getHourlyAssignedProjects = async (_req, res) => {
     try {
         const projects = await Project_1.default.find({
-            assigned_to: { $nin: ["", null] },
+            assigned_to: { $nin: ["", null] }, // assigned
             project_type: "hourly",
             status: "assigned",
             price_per_hour: { $ne: null },
@@ -704,19 +701,18 @@ const getHourlyAssignedProjects = async (_req, res) => {
         res.json({ success: true, projects });
     }
     catch (err) {
-        console.error("Error fetching hourly assigned projects:", err);
+        console.error("❌ Error fetching hourly assigned projects:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 exports.getHourlyAssignedProjects = getHourlyAssignedProjects;
-
 /* -------------------- 🔹 Update Hourly Project -------------------- */
 const updateHourlyProject = async (req, res) => {
     try {
         const projectId = req.params.id;
         const allowedFields = ["project_name", "profile_name", "sheet_name", "project_type", "price_per_hour"];
         const updateData = {};
-        
+        // Only allow updating these fields
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {
                 updateData[key] = req.body[key];
@@ -734,7 +730,6 @@ const updateHourlyProject = async (req, res) => {
     }
 };
 exports.updateHourlyProject = updateHourlyProject;
-
 // Get project details for Go to Project button
 const getProjectDetails = async (req, res) => {
     const { projectId } = req.params;
@@ -761,7 +756,6 @@ const getProjectDetails = async (req, res) => {
     }
 };
 exports.getProjectDetails = getProjectDetails;
-
 // Update project status when clicking Go to Project
 const updateProjectStatus = async (req, res) => {
     const { projectId } = req.params;
@@ -782,11 +776,11 @@ const updateProjectStatus = async (req, res) => {
     }
 };
 exports.updateProjectStatus = updateProjectStatus;
-
 // For go to project button to write columns
 const writeProjectColumns = async (req, res) => {
     try {
         const projectId = req.params.projectId;
+        // Fetch project
         const project = await Project_1.default.findOne({ project_id: projectId });
         if (!project) {
             return res.status(404).json({ success: false, message: "Project not found." });
@@ -794,6 +788,7 @@ const writeProjectColumns = async (req, res) => {
         if (!project.google_sheet_url) {
             return res.status(400).json({ success: false, message: "Google Sheet URL missing." });
         }
+        // Extract spreadsheet ID
         const spreadsheetId = project.google_sheet_url.split("/d/")[1]?.split("/")[0];
         if (!spreadsheetId) {
             return res.status(400).json({ success: false, message: "Invalid Google Sheet URL." });
@@ -803,7 +798,7 @@ const writeProjectColumns = async (req, res) => {
         const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
         const sheetsList = sheetMeta.data.sheets ?? [];
         const tabName = project.project_name?.trim() || "";
-
+        // Debug logs to help match sheets when titles differ slightly
         console.log('Looking for tabName:', tabName);
         console.log('Available sheets:', sheetsList.map((s) => s.properties?.title));
         console.log('Normalized sheet titles:', sheetsList.map((s) => String(s.properties?.title || '').replace(/[^\w\s]/g, '').trim().toLowerCase()));
@@ -825,10 +820,11 @@ const writeProjectColumns = async (req, res) => {
         if (!sheetObj || !sheetObj.properties || sheetObj.properties.sheetId === undefined) {
             return res.status(400).json({
                 success: false,
-                message: `Tab "${tabName}" not found in Google Sheet.`,
+                message: `❌ Tab "${tabName}" not found in Google Sheet.`,
             });
         }
         const sheetId = sheetObj.properties.sheetId;
+        // Only NON-file-based fixed projects allowed
         if (project.is_file_based) {
             return res.status(400).json({
                 success: false,
@@ -841,7 +837,6 @@ const writeProjectColumns = async (req, res) => {
                 message: "Only fixed-type projects are handled.",
             });
         }
-
         // ----------------------- NORMALIZATION HELPER -----------------------
         const normalize = (str) => str.trim().toLowerCase();
         // ----------------------- WORKER COLUMN MAP -----------------------
@@ -853,19 +848,19 @@ const writeProjectColumns = async (req, res) => {
             "Fifth Entry": ["Worker One", "Worker Two", "Worker Three", "Worker Four", "Worker Five"],
         };
         const workerColumns = workerMap[project.fixed_option || ""] ?? [];
-
+        // Read existing header
         const headerResp = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: `${tabName}!A1:BZ1`,
         });
         const existingHeader = headerResp.data.values?.[0] ?? [];
         const finalHeader = [...existingHeader];
+        // Create lowercase version for comparison
         const finalHeaderNormalized = finalHeader.map((h) => normalize(h));
-
         // ----------------------- ADD MISSING WORKER COLUMNS -----------------------
         for (const col of workerColumns) {
             if (!finalHeaderNormalized.includes(normalize(col))) {
-                finalHeader.push(col);
+                finalHeader.push(col); // Add at the end
             }
         }
         // If headers already match (no change)
@@ -875,7 +870,6 @@ const writeProjectColumns = async (req, res) => {
                 message: "Header already aligned — no changes required.",
             });
         }
-
         // ----------------------- UPDATE ONLY HEADER ROW -----------------------
         await sheets.spreadsheets.values.update({
             spreadsheetId,
@@ -883,7 +877,6 @@ const writeProjectColumns = async (req, res) => {
             valueInputOption: "RAW",
             requestBody: { values: [finalHeader] },
         });
-
         // ----------------------- STYLE HEADER ROW -----------------------
         await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
@@ -906,11 +899,11 @@ const writeProjectColumns = async (req, res) => {
         });
         return res.json({
             success: true,
-            message: `Sheet "${tabName}" is ready — worker columns ensured.`,
+            message: `✅ Sheet "${tabName}" is ready — worker columns ensured.`,
         });
     }
     catch (err) {
-        console.error("Error in writeProjectColumns:", err);
+        console.error("❌ Error in writeProjectColumns:", err);
         return res.status(500).json({
             success: false,
             message: "Internal server error while writing to sheet.",
@@ -918,7 +911,7 @@ const writeProjectColumns = async (req, res) => {
     }
 };
 exports.writeProjectColumns = writeProjectColumns;
-
+// server/src/controllers/adminController.ts
 // ----------------- Sync service: syncAllProjects -----------------
 const syncAllProjects = async () => {
     try {
@@ -926,20 +919,20 @@ const syncAllProjects = async () => {
         // Find projects that are "In Work" in sheet_status (matches your MySQL logic)
         const inWorkProjects = await Project_1.default.find({ sheet_status: "In Work" }).select("project_id project_name google_sheet_url").lean();
         if (!inWorkProjects || inWorkProjects.length === 0) {
-            console.log("No active projects found for sync.");
+            console.log("⚠️ No active projects found for sync.");
             return { success: false, message: "No active projects found." };
         }
         for (const proj of inWorkProjects) {
             const { project_id, google_sheet_url, project_name } = proj;
             if (!google_sheet_url) {
-                console.log(`Project ${project_id} has no google_sheet_url — skipping.`);
+                console.log(`⚠️ Project ${project_id} has no google_sheet_url — skipping.`);
                 continue;
             }
-            console.log(`Processing project: ${project_id} (${project_name})`);
+            console.log(`📂 Processing project: ${project_id} (${project_name})`);
             // extract spreadsheetId
             const spreadsheetId = (google_sheet_url || "").split("/d/")[1]?.split("/")[0];
             if (!spreadsheetId) {
-                console.log(`Invalid sheet URL for project ${project_id}. Skipping.`);
+                console.log(`⚠️ Invalid sheet URL for project ${project_id}. Skipping.`);
                 continue;
             }
             // Get sheet metadata
@@ -951,10 +944,10 @@ const syncAllProjects = async () => {
             // Find matching tab by normalized name (case-insensitive trim)
             const matchedTab = tabNames.find((name) => (name || "").trim().toLowerCase() === normalizedProjectName);
             if (!matchedTab) {
-                console.log(`Skipping project ${project_id}: No tab found matching project name "${project_name}".`);
+                console.log(`⚠️ Skipping project ${project_id}: No tab found matching project name "${project_name}".`);
                 continue;
             }
-            console.log(`Found matching tab: ${matchedTab}`);
+            console.log(`📑 Found matching tab: ${matchedTab}`);
             // Read full area (header + rows)
             const sheetResponse = await sheetsClient.spreadsheets.values.get({
                 spreadsheetId,
@@ -963,8 +956,7 @@ const syncAllProjects = async () => {
             const sheetData = sheetResponse.data.values || [];
             const sheetHeaders = sheetData[0] || [];
             const sheetRows = sheetData.slice(1);
-            console.log(`[${matchedTab}] Sheet has ${sheetRows.length} rows.`);
-
+            console.log(`📊 [${matchedTab}] Sheet has ${sheetRows.length} rows.`);
             // Get existing saved data from MongoDB
             const existing = (await ProjectData.findOne({ project_id }).lean());
             let dbDataArray = [];
@@ -973,6 +965,7 @@ const syncAllProjects = async () => {
             }
             const dbHeaders = dbDataArray[0] || [];
             const dbRows = dbDataArray.slice(1);
+            // Compare — count changes
             let changesFound = 0;
             const maxRows = Math.max(sheetRows.length, dbRows.length);
             for (let i = 0; i < maxRows; i++) {
@@ -994,17 +987,17 @@ const syncAllProjects = async () => {
                 const finalDataToSave = [sheetHeaders, ...sheetRows];
                 // Upsert into ProjectData
                 await ProjectData.findOneAndUpdate({ project_id }, { project_id, row_data: finalDataToSave, updated_at: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true });
-                console.log(`DB updated for project ${project_id}. Detected ${changesFound} changed cell(s).`);
+                console.log(`💾 DB updated for project ${project_id}. Detected ${changesFound} changed cell(s).`);
             }
             else {
-                console.log(`No changes for project ${project_id}. DB is in sync.`);
+                console.log(`✅ No changes for project ${project_id}. DB is in sync.`);
             }
         }
-        console.log("Project data sync completed.");
+        console.log("✅ Project data sync completed.");
         return { success: true, message: "Project data synchronized successfully." };
     }
     catch (err) {
-        console.error("Error syncing project data:", err);
+        console.error("❌ Error syncing project data:", err);
         return { success: false, message: "Failed to sync project data." };
     }
 };
@@ -1017,7 +1010,6 @@ const syncProjectDataController = async (req, res) => {
     return res.status(500).json({ success: false, message: result.message });
 };
 exports.syncProjectDataController = syncProjectDataController;
-
 // GET ALL USERS EXCEPT ADMIN
 const getUsersProfiles = async (req, res) => {
     try {
@@ -1039,7 +1031,6 @@ const getUsersProfiles = async (req, res) => {
     }
 };
 exports.getUsersProfiles = getUsersProfiles;
-
 // This is for user payroll
 const getUserPayroll = async (req, res) => {
     try {
@@ -1057,19 +1048,20 @@ const getUserPayroll = async (req, res) => {
                 message: "Start date and end date are required.",
             });
         }
-
         // ---------------------
         // Convert dates, set end-of-day
         // ---------------------
         const start = new Date(start_date);
         const end = new Date(end_date);
         end.setHours(23, 59, 59, 999);
-
         // ---------------------
         // Collections
         // ---------------------
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
+        // Build a tolerant regex pattern from the selected username that ignores
+        // extra whitespace/punctuation and is case-insensitive. This helps match
+        // stored worker_name variations like extra spaces, dashes or commas.
         const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const nameWords = selectedUsername.split(/\W+/).filter(Boolean);
         const namePattern = nameWords.length
@@ -1098,6 +1090,7 @@ const getUserPayroll = async (req, res) => {
             },
             { $unwind: "$ws" },
             {
+                // tolerant username match (ignores punctuation/extra spaces, case-insensitive)
                 $match: { "ws.worker_name": { $regex: namePattern, $options: "i" } }
             },
             {
@@ -1199,7 +1192,6 @@ const getUserPayroll = async (req, res) => {
     }
 };
 exports.getUserPayroll = getUserPayroll;
-
 // -------------------- 🔹 Fetch only profiles for the dropdown --------------------
 const getProfilesForDropDown = async (req, res) => {
     try {
@@ -1219,7 +1211,6 @@ const getProfilesForDropDown = async (req, res) => {
     }
 };
 exports.getProfilesForDropDown = getProfilesForDropDown;
-
 // -------------------- 🔹 Fetch individual profile payroll --------------------
 const getProfilePayroll = async (req, res) => {
     try {
@@ -1237,6 +1228,7 @@ const getProfilePayroll = async (req, res) => {
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
         const WorkerSalaries = db.collection("workersalaries");
+        // ---------------- Fixed Project Payroll ----------------
         const fixedPipeline = [
             { $match: { status: "completed", profile_name: profileName, updated_at: { $gte: start, $lte: end } } },
             { $lookup: { from: "workersalaries", localField: "project_id", foreignField: "project_id", as: "ws" } },
@@ -1265,7 +1257,6 @@ const getProfilePayroll = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
-
         // ---------------- Hourly Project Payroll ----------------
         const hourlyPipeline = [
             { $match: { profile_name: profileName, updated_at: { $gte: start, $lte: end } } },
@@ -1288,7 +1279,6 @@ const getProfilePayroll = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const hourlyResults = await Hourly.aggregate(hourlyPipeline).toArray();
-
         // ---------------- Combine Fixed + Hourly (unique project_id) ----------------
         const combinedMap = {};
         [...fixedResults, ...hourlyResults].forEach((item) => {
@@ -1307,7 +1297,6 @@ const getProfilePayroll = async (req, res) => {
     }
 };
 exports.getProfilePayroll = getProfilePayroll;
-
 // -------------------- 🔹 Fetch ALL USERS payroll --------------------
 const getAllUsersPayroll = async (req, res) => {
     try {
@@ -1323,7 +1312,6 @@ const getAllUsersPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
-
         /* ================= FIXED PAYROLL ================= */
         const fixedResults = await Projects.aggregate([
             {
@@ -1341,7 +1329,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$ws" },
-
+            /* 🔹 Normalize numeric fields */
             {
                 $addFields: {
                     price_worker_one_num: {
@@ -1412,7 +1400,6 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= HOURLY PAYROLL ================= */
         const hourlyResults = await HourlyRecords.aggregate([
             {
@@ -1424,7 +1411,7 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$p" },
-            /* Filter using PROJECT date (important) */
+            /* 🔹 Filter using PROJECT date (important) */
             {
                 $match: {
                     "p.updated_at": { $gte: start, $lte: end },
@@ -1459,7 +1446,6 @@ const getAllUsersPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= COMBINE ================= */
         const payrollMap = new Map();
         fixedResults.forEach((r) => {
@@ -1510,7 +1496,6 @@ const getAllUsersPayroll = async (req, res) => {
     }
 };
 exports.getAllUsersPayroll = getAllUsersPayroll;
-
 // -------------------- 🔹 Fetch ALL PROFILES payroll --------------------
 const getAllProfilesPayroll = async (req, res) => {
     try {
@@ -1526,7 +1511,6 @@ const getAllProfilesPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
-
         /* ================= FIXED PAYROLL ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1544,6 +1528,7 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
             { $unwind: "$ws" },
+            /* 🔹 Normalize values */
             {
                 $addFields: {
                     profile_debit_num: {
@@ -1564,6 +1549,7 @@ const getAllProfilesPayroll = async (req, res) => {
                     },
                 },
             },
+            /* 🔹 FIRST GROUP: profile + project (MYSQL EQUIVALENT) */
             {
                 $group: {
                     _id: {
@@ -1571,11 +1557,11 @@ const getAllProfilesPayroll = async (req, res) => {
                         project_id: "$project_id",
                     },
                     profile_name: { $first: "$profile_name" },
-                    fixed_profile_debit: { $first: "$profile_debit_num" },
+                    fixed_profile_debit: { $first: "$profile_debit_num" }, // ✅ ANY_VALUE
                     fixed_entries: { $sum: "$entries_num" },
                 },
             },
-
+            /* 🔹 SECOND GROUP: per profile */
             {
                 $group: {
                     _id: "$profile_name",
@@ -1585,7 +1571,6 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= HOURLY PAYROLL ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1623,8 +1608,7 @@ const getAllProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-
-            /*FIRST GROUP: profile + project */
+            /* 🔹 FIRST GROUP: profile + project */
             {
                 $group: {
                     _id: {
@@ -1632,11 +1616,11 @@ const getAllProfilesPayroll = async (req, res) => {
                         project_id: "$project_id",
                     },
                     profile_name: { $first: "$p.profile_name" },
-                    hourly_profile_debit: { $first: "$profile_debit_num" },
+                    hourly_profile_debit: { $first: "$profile_debit_num" }, // ✅ ANY_VALUE
                     hourly_entries: { $sum: "$hours_num" },
                 },
             },
-            /*SECOND GROUP: per profile */
+            /* 🔹 SECOND GROUP: per profile */
             {
                 $group: {
                     _id: "$profile_name",
@@ -1646,7 +1630,6 @@ const getAllProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -1670,7 +1653,6 @@ const getAllProfilesPayroll = async (req, res) => {
             e.hourly_entries = h.hourly_entries;
             map.set(h.profile_name, e);
         });
-
         /* ================= FINAL TOTALS ================= */
         const final = Array.from(map.values()).map((e) => ({
             ...e,
@@ -1685,7 +1667,6 @@ const getAllProfilesPayroll = async (req, res) => {
     }
 };
 exports.getAllProfilesPayroll = getAllProfilesPayroll;
-
 // -------------------- 🔹 FILTERED PROFILES PAYROLL (RYK / NON-BWP) --------------------
 const getFilteredProfilesPayroll = async (req, res) => {
     try {
@@ -1702,7 +1683,6 @@ const getFilteredProfilesPayroll = async (req, res) => {
         const targetCompany = "3 into 3";
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
-
         /* ================= FIXED PAYROLL (NON-BWP) ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1741,7 +1721,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-
+            /* 🔹 Group per project + profile */
             {
                 $group: {
                     _id: {
@@ -1757,8 +1737,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-
-            /*Net debit (profile - BWP) */
+            /* 🔹 Net debit (profile - BWP) */
             {
                 $addFields: {
                     net_fixed_debit: {
@@ -1766,8 +1745,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     },
                 },
             },
-
-            /*Final per profile */
+            /* 🔹 Final per profile */
             {
                 $group: {
                     _id: "$profile_name",
@@ -1775,8 +1753,7 @@ const getFilteredProfilesPayroll = async (req, res) => {
                     fixed_profile_debit: { $sum: "$net_fixed_debit" },
                 },
             },
-        ]).toArray(); 
-
+        ]).toArray();
         /* ================= HOURLY PAYROLL (NON-BWP) ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1845,7 +1822,6 @@ const getFilteredProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -1876,7 +1852,6 @@ const getFilteredProfilesPayroll = async (req, res) => {
     }
 };
 exports.getFilteredProfilesPayroll = getFilteredProfilesPayroll;
-
 // -------------------- 🔹 FILTERED PROFILES PAYROLL (BWP) --------------------
 const getFilteredBWPProfilesPayroll = async (req, res) => {
     try {
@@ -1893,7 +1868,6 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
         const targetCompany = "3 into 3";
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
-
         /* ================= FIXED PAYROLL (BWP) ================= */
         const fixed = await Projects.aggregate([
             {
@@ -1936,7 +1910,6 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= HOURLY PAYROLL (BWP) ================= */
         const hourly = await HourlyRecords.aggregate([
             {
@@ -1979,7 +1952,6 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= MERGE FIXED + HOURLY ================= */
         const map = new Map();
         fixed.forEach((f) => {
@@ -2002,7 +1974,6 @@ const getFilteredBWPProfilesPayroll = async (req, res) => {
     }
 };
 exports.getFilteredBWPProfilesPayroll = getFilteredBWPProfilesPayroll;
-
 // -------------------- 🔹 GET COMPANIES FOR DROPDOWN --------------------
 const getCompanies = async (req, res) => {
     try {
@@ -2018,8 +1989,7 @@ const getCompanies = async (req, res) => {
     }
 };
 exports.getCompanies = getCompanies;
-
-// -------------------- COMPANY PAYROLL --------------------
+// -------------------- 🔹 COMPANY PAYROLL --------------------
 const getCompanyPayroll = async (req, res) => {
     try {
         const { company } = req.params;
@@ -2038,7 +2008,6 @@ const getCompanyPayroll = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const HourlyRecords = db.collection("hourlyprojectrecords");
-
         /* ================= FIXED PROJECTS ================= */
         const fixed = await Projects.aggregate([
             {
@@ -2097,8 +2066,8 @@ const getCompanyPayroll = async (req, res) => {
                 },
             },
         ]).toArray();
-
         /* ================= HOURLY PROJECTS ================= */
+        /* ================= HOURLY (NOW WORKS) ================= */
         const hourly = await Projects.aggregate([
             {
                 $match: {
@@ -2110,8 +2079,8 @@ const getCompanyPayroll = async (req, res) => {
             {
                 $lookup: {
                     from: "hourlyprojectrecords",
-                    localField: "project_id",
-                    foreignField: "project_id",
+                    localField: "project_id", // plain id
+                    foreignField: "project_id", // plain id
                     as: "hr",
                 },
             },
@@ -2156,13 +2125,13 @@ const getCompanyPayroll = async (req, res) => {
                 price_per_entry: prices.filter(Boolean).join(", "), // now lumpsum included
             };
         });
-
         /* ================= TOTALS ================= */
         const fixedSum = fixed.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const hourlySum = hourly.reduce((sum, i) => sum + (i.profile_debit || 0), 0);
         const grandSum = fixedSum + hourlySum;
+        // Use fixedWithPrices (adds price_per_entry string) and combine with hourly
         const combinedData = [...fixedWithPrices, ...hourly];
-
+        // Sort combined results by numeric project_id when possible (ascending)
         combinedData.sort((a, b) => {
             const aNum = parseInt(String(a.project_id || "").replace(/\D/g, ""), 10);
             const bNum = parseInt(String(b.project_id || "").replace(/\D/g, ""), 10);
@@ -2172,6 +2141,7 @@ const getCompanyPayroll = async (req, res) => {
                 return -1;
             if (!isNaN(bNum))
                 return 1;
+            // Fallback to string compare
             return String(a.project_id || "").localeCompare(String(b.project_id || ""));
         });
         res.json({
@@ -2190,7 +2160,6 @@ const getCompanyPayroll = async (req, res) => {
     }
 };
 exports.getCompanyPayroll = getCompanyPayroll;
-
 /* ===========================
    GET SUBMITTED PROJECTS
 =========================== */
@@ -2204,7 +2173,7 @@ const getSubmittedProjects = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Error fetching submitted projects:", error);
+        console.error("❌ Error fetching submitted projects:", error);
         res.status(500).json({
             success: false,
             message: "Failed to fetch submitted projects",
@@ -2212,7 +2181,6 @@ const getSubmittedProjects = async (req, res) => {
     }
 };
 exports.getSubmittedProjects = getSubmittedProjects;
-
 // Get completed projects with optional filters
 const getCompletedProjects = async (req, res) => {
     try {
@@ -2236,7 +2204,59 @@ const getCompletedProjects = async (req, res) => {
     }
 };
 exports.getCompletedProjects = getCompletedProjects;
-
+const updateCompletedProject = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { project_name, profile_name, sheet_name, total_entries, project_type, fixed_option, lumpsum_price, price_worker_one, price_worker_two, shift, } = req.body;
+        if (!project_name || !profile_name || !sheet_name || total_entries === undefined || total_entries === null) {
+            return res.status(400).json({
+                success: false,
+                message: "project_name, profile_name, sheet_name and total_entries are required",
+            });
+        }
+        const parsedTotalEntries = Number(total_entries);
+        if (Number.isNaN(parsedTotalEntries) || parsedTotalEntries < 0) {
+            return res.status(400).json({
+                success: false,
+                message: "total_entries must be a valid non-negative number",
+            });
+        }
+        const numericInputs = { lumpsum_price, price_worker_one, price_worker_two };
+        const parsedNumeric = {};
+        for (const [key, value] of Object.entries(numericInputs)) {
+            const parsed = value === undefined || value === null || value === "" ? 0 : Number(value);
+            if (Number.isNaN(parsed) || parsed < 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `${key} must be a valid non-negative number`,
+                });
+            }
+            parsedNumeric[key] = parsed;
+        }
+        const updatedProject = await Project_1.default.findByIdAndUpdate(id, {
+            project_name,
+            profile_name,
+            sheet_name,
+            total_entries: parsedTotalEntries,
+            project_type: project_type ?? "",
+            fixed_option: fixed_option ?? "",
+            shift: shift ?? "",
+            ...parsedNumeric,
+        }, { new: true, runValidators: true });
+        if (!updatedProject) {
+            return res.status(404).json({ success: false, message: "Project not found" });
+        }
+        res.json({ success: true, project: updatedProject });
+    }
+    catch (err) {
+        console.error("Error updating completed project:", err);
+        if (err.code === 11000) {
+            return res.status(409).json({ success: false, message: "Project name already exists" });
+        }
+        res.status(500).json({ success: false, message: "Error updating completed project" });
+    }
+};
+exports.updateCompletedProject = updateCompletedProject;
 // Get unique completed project names for dropdown
 const getCompletedProjectNames = async (req, res) => {
     try {
@@ -2249,7 +2269,6 @@ const getCompletedProjectNames = async (req, res) => {
     }
 };
 exports.getCompletedProjectNames = getCompletedProjectNames;
-
 // Get projects that are pending revision (marked revised and set back to pending)
 const getPendingRevisions = async (_req, res) => {
     try {
@@ -2262,7 +2281,6 @@ const getPendingRevisions = async (_req, res) => {
     }
 };
 exports.getPendingRevisions = getPendingRevisions;
-
 // -------------------------
 // Deletable Projects
 // -------------------------
@@ -2283,7 +2301,6 @@ const getDeletableProjectNames = async (req, res) => {
     }
 };
 exports.getDeletableProjectNames = getDeletableProjectNames;
-
 const getDeletableProjects = async (req, res) => {
     try {
         const { start_date, end_date, project_id, project_name } = req.query;
@@ -2304,7 +2321,6 @@ const getDeletableProjects = async (req, res) => {
     }
 };
 exports.getDeletableProjects = getDeletableProjects;
-
 const deleteProject = async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -2313,6 +2329,7 @@ const deleteProject = async (req, res) => {
             console.error("MongoDB not connected");
             return res.status(500).json({ message: "Database not ready" });
         }
+        // Remove related hourly records and worker salaries and project data
         await dbInstance.collection("hourlyprojectrecords").deleteMany({ project_id: projectId });
         await dbInstance.collection("workersalaries").deleteMany({ project_id: projectId });
         await dbInstance.collection("project_data").deleteMany({ project_id: projectId });
@@ -2328,7 +2345,6 @@ const deleteProject = async (req, res) => {
     }
 };
 exports.deleteProject = deleteProject;
-
 // -------------------------
 // Project Expense
 // -------------------------
@@ -2346,7 +2362,6 @@ const getProjectsList = async (req, res) => {
     }
 };
 exports.getProjectsList = getProjectsList;
-
 const getProjectPayroll = async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -2360,7 +2375,9 @@ const getProjectPayroll = async (req, res) => {
             console.error("MongoDB not connected");
             return res.status(500).json({ success: false, message: "Database not ready" });
         }
+        // Fixed salaries (workersalaries)
         const fixed = await dbInst.collection("workersalaries").find({ project_id: projectId }).toArray();
+        // Hourly records
         const hourly = await dbInst.collection("hourlyprojectrecords").find({ project_id: projectId }).toArray();
         const fixedMapped = fixed.map((ws) => ({
             project_id: project.project_id,
@@ -2373,7 +2390,6 @@ const getProjectPayroll = async (req, res) => {
             profile_debit: ws.profile_debit ?? null,
             company: project.company ?? "",
         }));
-
         const hourlyMapped = hourly.map((h) => ({
             project_id: project.project_id,
             project_name: project.project_name,
@@ -2385,7 +2401,6 @@ const getProjectPayroll = async (req, res) => {
             profile_debit: null,
             company: project.company ?? "",
         }));
-
         const combined = [...fixedMapped, ...hourlyMapped];
         res.json({ success: true, data: combined });
     }
@@ -2395,7 +2410,6 @@ const getProjectPayroll = async (req, res) => {
     }
 };
 exports.getProjectPayroll = getProjectPayroll;
-
 // Approval Logic for projects
 const normalizeName = (name) => name
     ?.normalize("NFKD")
@@ -2403,7 +2417,6 @@ const normalizeName = (name) => name
     .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
     .replace(/[^a-z0-9]/gi, "")
     .toLowerCase();
-
 // Single Entry projects approval logic
 const approveSingleEntryProject = async (req, res) => {
     try {
@@ -2415,7 +2428,9 @@ const approveSingleEntryProject = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Project not found' });
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+        // If client provided salaries explicitly, use them (useful when ProjectData isn't available)
         if (Array.isArray(providedSalaries) && providedSalaries.length > 0) {
+            // Get existing DB workers to calculate profileDebit from their stored entries
             const existingWorkersForProvided = await WorkerSalaryCollection.find({ project_id: projectId }).toArray();
             const totalEntriesForProvided = existingWorkersForProvided.reduce((sum, w) => {
                 return sum + (Number(w.no_of_entries) || 0);
@@ -2429,11 +2444,11 @@ const approveSingleEntryProject = async (req, res) => {
                 }
                 await WorkerSalaryCollection.updateOne({ worker_name: worker, project_id: projectId }, { $set: { salary, profile_debit: profileDebitForProvided } }, { upsert: true });
             }
+            // Stamp correct profile_debit on ALL worker rows for this project
             await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebitForProvided } });
             await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
             return res.json({ success: true, message: 'Single entry project approved (from provided salaries)' });
         }
-
         // Otherwise, attempt the original ProjectData-driven flow
         const projectData = (await ProjectData.findOne({ project_id: projectId }));
         if (!projectData) {
@@ -2447,6 +2462,7 @@ const approveSingleEntryProject = async (req, res) => {
         users.forEach(u => (userMap[normalizeName(u.name)] = u.name));
         const salaries = {};
         const entryCounts = {};
+        // Sheet always contains ALL rows — so entryCounts will be complete for all workers
         projectData.row_data.forEach((row) => {
             const raw = row[row.length - 1];
             if (!raw)
@@ -2459,8 +2475,7 @@ const approveSingleEntryProject = async (req, res) => {
                 entryCounts[real] = (entryCounts[real] || 0) + 1;
             });
         });
-
-        //Sheet has ALL rows so entryCounts is already complete — no DB merge needed
+        // ✅ Sheet has ALL rows so entryCounts is already complete — no DB merge needed
         const totalEntries = Object.values(entryCounts).reduce((a, b) => a + b, 0);
         const profileDebit = totalEntries * (project.profile_price_per_entry ?? 0);
         // If the project is already completed (treated as paid), create payroll adjustments
@@ -2500,8 +2515,7 @@ const approveSingleEntryProject = async (req, res) => {
                 }
             }
         }
-
-        //Stamp correct profile_debit on ALL worker rows — including workers not in current sync
+        // ✅ Stamp correct profile_debit on ALL worker rows — including workers not in current sync
         await WorkerSalaryCollection.updateMany({ project_id: projectId }, { $set: { profile_debit: profileDebit } });
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({ success: true, message: "Single entry project approved" });
@@ -2511,9 +2525,7 @@ const approveSingleEntryProject = async (req, res) => {
         res.status(500).json({ success: false });
     }
 };
-
 exports.approveSingleEntryProject = approveSingleEntryProject;
-
 // Approve MultiEntry Projects Logic
 const approveMultiEntryProject = async (req, res) => {
     try {
@@ -2524,7 +2536,7 @@ const approveMultiEntryProject = async (req, res) => {
         if (!project || !projectData) {
             return res.status(404).json({ success: false, message: "Project not found" });
         }
-
+        // Determine number of entries based on project option
         const entryCountMap = {
             "Double Entry": 2,
             "Triple Entry": 3,
@@ -2535,7 +2547,7 @@ const approveMultiEntryProject = async (req, res) => {
         if (!numEntries) {
             return res.status(400).json({ success: false, message: "Invalid multi-entry option" });
         }
-
+        // Map worker column index → price
         const priceMap = [
             project.price_worker_one ?? 0,
             project.price_worker_two ?? 0,
@@ -2543,15 +2555,16 @@ const approveMultiEntryProject = async (req, res) => {
             project.price_worker_four ?? 0,
             project.price_worker_five ?? 0,
         ];
-
+        // Load users and create normalized map
         const users = await user_1.default.find({}, { name: 1 });
         const userMap = {};
         users.forEach(u => {
             userMap[normalizeName(u.name)] = u.name;
         });
-
+        // Initialize salary and entry counts
         const salaries = {};
         const entryCounts = {};
+        // Process each row safely
         if (Array.isArray(projectData.row_data) && projectData.row_data.length > 0) {
             const allRows = projectData.row_data;
             // Try to detect worker columns from header (first row saved by sync)
@@ -2566,6 +2579,7 @@ const approveMultiEntryProject = async (req, res) => {
             ].slice(0, numEntries);
             const workerIndices = workerColumnNames.map((w) => headerNormalized.indexOf((w || "").trim().toLowerCase()));
             const foundHeaderCols = workerIndices.some((idx) => idx >= 0);
+            // If header columns found, use those indices; otherwise fall back to previous "last N columns" approach
             if (foundHeaderCols) {
                 // iterate data rows (skip header)
                 for (let r = 1; r < allRows.length; r++) {
@@ -2577,6 +2591,7 @@ const approveMultiEntryProject = async (req, res) => {
                         const rawCell = row[colIndex];
                         if (!rawCell)
                             continue;
+                        // allow comma-separated names in a cell
                         const names = String(rawCell).split(",").map(s => s.trim()).filter(Boolean);
                         for (const name of names) {
                             const normalized = normalizeName(name);
@@ -2591,6 +2606,7 @@ const approveMultiEntryProject = async (req, res) => {
                 }
             }
             else {
+                // Fallback: use last `numEntries` columns of each row (legacy behavior)
                 allRows.forEach((row) => {
                     if (!row || !Array.isArray(row))
                         return;
@@ -2613,9 +2629,9 @@ const approveMultiEntryProject = async (req, res) => {
                 });
             }
         }
-
         // Calculate total profile debit
         const profileDebit = Object.values(salaries).reduce((a, b) => a + b, 0);
+        // If project already marked completed (treated as paid), create payroll adjustments
         if (project.status === "completed") {
             try {
                 await (0, payrollController_1.applyRevisionInternal)({ projectId, reason: 'Approved via admin (multi-entry)', applyMode: 'applied', created_by: req?.user?.name || null });
@@ -2629,6 +2645,7 @@ const approveMultiEntryProject = async (req, res) => {
         }
         const WorkerSalaryCollection = db.collection("workersalaries");
         const RevisedWorkerSalaryCollection = db.collection("revised_worker_salaries");
+        // Update salaries in DB
         for (const worker of Object.keys(salaries)) {
             const salary = salaries[worker];
             const entries = entryCounts[worker];
@@ -2663,6 +2680,7 @@ const approveMultiEntryProject = async (req, res) => {
                 }
             }
         }
+        // Mark project as completed
         await Project_1.default.updateOne({ project_id: projectId }, { status: "completed" });
         res.json({
             success: true,
@@ -2677,7 +2695,6 @@ const approveMultiEntryProject = async (req, res) => {
     }
 };
 exports.approveMultiEntryProject = approveMultiEntryProject;
-
 // Lumpsum Project Approval Logic
 const approveLumpsumProject = async (req, res) => {
     try {
@@ -2711,7 +2728,6 @@ const approveLumpsumProject = async (req, res) => {
     }
 };
 exports.approveLumpsumProject = approveLumpsumProject;
-
 // Reject a project
 const rejectProject = async (req, res) => {
     try {
@@ -2722,6 +2738,7 @@ const rejectProject = async (req, res) => {
                 message: "Project ID is required.",
             });
         }
+        // Find project
         const project = await Project_1.default.findOne({ project_id: projectId });
         if (!project) {
             return res.status(404).json({
@@ -2729,6 +2746,7 @@ const rejectProject = async (req, res) => {
                 message: "Project not found.",
             });
         }
+        // Reset project status and clear assignment
         project.status = "pending";
         project.assigned_to = "";
         project.assigned_to_ids = "";
@@ -2747,7 +2765,6 @@ const rejectProject = async (req, res) => {
     }
 };
 exports.rejectProject = rejectProject;
-
 // Update a payroll entry (project + worker salary row)
 const updatePayrollEntry = async (req, res) => {
     try {
@@ -2755,9 +2772,11 @@ const updatePayrollEntry = async (req, res) => {
         if (!project_id) {
             return res.status(400).json({ success: false, message: 'project_id is required' });
         }
+        // Fetch project
         const project = await Project_1.default.findOne({ project_id });
         if (!project)
             return res.status(404).json({ success: false, message: 'Project not found' });
+        // Update project-level fields if provided
         const projectUpdate = {};
         if (project_name !== undefined)
             projectUpdate.project_name = project_name;
@@ -2770,7 +2789,7 @@ const updatePayrollEntry = async (req, res) => {
         if (Object.keys(projectUpdate).length > 0) {
             await Project_1.default.updateOne({ project_id }, projectUpdate);
         }
-
+        // Update worker salary row in workersalaries collection
         const WorkerSalaryCollection = db.collection('workersalaries');
         const searchWorker = original_worker_name || worker_name;
         if (!searchWorker) {
@@ -2800,7 +2819,6 @@ const updatePayrollEntry = async (req, res) => {
     }
 };
 exports.updatePayrollEntry = updatePayrollEntry;
-
 // -------------------- 🔹 PAYROLL INFONAV BWP --------------------
 const getPayrollInfonavBwp = async (req, res) => {
     try {
@@ -2815,6 +2833,7 @@ const getPayrollInfonavBwp = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
+        // Fixed Projects: only BWP
         const fixedPipeline = [
             {
                 $match: {
@@ -2861,6 +2880,7 @@ const getPayrollInfonavBwp = async (req, res) => {
             { $sort: { project_id: 1 } },
         ];
         const fixedResults = await Projects.aggregate(fixedPipeline).toArray();
+        // Hourly Projects: only BWP
         const hourlyPipeline = [
             {
                 $lookup: {
@@ -2911,7 +2931,6 @@ const getPayrollInfonavBwp = async (req, res) => {
     }
 };
 exports.getPayrollInfonavBwp = getPayrollInfonavBwp;
-
 // -------------------- 🔹 PAYROLL FZ BWP --------------------
 const getPayrollFzBwp = async (req, res) => {
     try {
@@ -2926,6 +2945,7 @@ const getPayrollFzBwp = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         const Projects = db.collection("projects");
         const Hourly = db.collection("hourlyprojectrecords");
+        // Fixed Projects: only BWP for freelancerszone
         const fixedPipeline = [
             {
                 $match: {
@@ -3023,7 +3043,6 @@ const getPayrollFzBwp = async (req, res) => {
     }
 };
 exports.getPayrollFzBwp = getPayrollFzBwp;
-
 /* -------------------- 🔹 Mark Project Completed -------------------- */
 const markProjectCompleted = async (req, res) => {
     try {
@@ -3043,7 +3062,6 @@ const markProjectCompleted = async (req, res) => {
     }
 };
 exports.markProjectCompleted = markProjectCompleted;
-
 // Mark project as pending for revision: snapshot current workersalaries and set project to pending
 const markProjectPendingForRevision = async (req, res) => {
     try {
@@ -3064,9 +3082,9 @@ const markProjectPendingForRevision = async (req, res) => {
             old_entries: Number(r.no_of_entries || 0),
             new_entries: Number(r.no_of_entries || 0),
         }));
-
         // Create a ProjectRevision snapshot record
         await projectRevision_1.default.create({ project_id: projectId, created_by: performedBy || null, summary: 'Snapshot before revision', worker_diffs, notes: reason || '' });
+        // Mark project as revised and pending
         project.is_revised = true;
         project.status = 'pending';
         if (!project.original_completed_at)
@@ -3079,5 +3097,4 @@ const markProjectPendingForRevision = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
-
 exports.markProjectPendingForRevision = markProjectPendingForRevision;

@@ -47,6 +47,7 @@ router.get("/companies", adminController_1.getCompanies);
 router.get("/payroll-company/:company", adminController_1.getCompanyPayroll);
 router.get("/submitted-projects", adminController_1.getSubmittedProjects);
 router.get("/get-completed-projects", adminController_1.getCompletedProjects);
+router.put("/update-completed-project/:id", adminController_1.updateCompletedProject);
 router.get("/get-completed-project-names", adminController_1.getCompletedProjectNames);
 router.get("/get-pending-revisions", adminController_1.getPendingRevisions);
 router.get("/get-deletable-project-names", adminController_1.getDeletableProjectNames);
@@ -62,7 +63,6 @@ router.post("/reject-project", adminController_1.rejectProject);
 router.post("/save-hourly-calculation", adminController_1.saveHourlyCalculation);
 router.post("/mark-project-completed", adminController_1.markProjectCompleted);
 router.post("/mark-project-pending-for-revision", adminController_2.markProjectPendingForRevision);
-// Payroll / Revisions
 router.post('/payroll-adjustments', payrollController_1.createAdjustment);
 router.get('/payroll-adjustments', payrollController_1.listAdjustments);
 router.post('/payroll-adjustments/:id/apply', payrollController_1.markAdjustmentApplied);
