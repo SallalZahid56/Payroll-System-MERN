@@ -2207,7 +2207,7 @@ exports.getCompletedProjects = getCompletedProjects;
 const updateCompletedProject = async (req, res) => {
     try {
         const { id } = req.params;
-        const { project_name, profile_name, sheet_name, total_entries, project_type, fixed_option, lumpsum_price, price_worker_one, price_worker_two, shift, } = req.body;
+        const { project_name, profile_name, sheet_name, total_entries, project_type, fixed_option, lumpsum_price, price_worker_one, price_worker_two, price_worker_three, price_worker_four, price_worker_five, profile_price_per_entry, shift, } = req.body;
         if (!project_name || !profile_name || !sheet_name || total_entries === undefined || total_entries === null) {
             return res.status(400).json({
                 success: false,
@@ -2221,7 +2221,15 @@ const updateCompletedProject = async (req, res) => {
                 message: "total_entries must be a valid non-negative number",
             });
         }
-        const numericInputs = { lumpsum_price, price_worker_one, price_worker_two };
+        const numericInputs = {
+            lumpsum_price,
+            price_worker_one,
+            price_worker_two,
+            price_worker_three,
+            price_worker_four,
+            price_worker_five,
+            profile_price_per_entry,
+        };
         const parsedNumeric = {};
         for (const [key, value] of Object.entries(numericInputs)) {
             const parsed = value === undefined || value === null || value === "" ? 0 : Number(value);
