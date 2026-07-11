@@ -10,7 +10,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import "./index.css";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import ProfileDashboard from "./pages/ProfileDashboard";
-
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -19,6 +20,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {/* Public Routes */}
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* ====================== */}
         {/* Admin Protected Routes */}
@@ -31,7 +34,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </PrivateRoute>
           }
         >
-          {/* These will render inside <AdminDashboard /> */}
           <Route index element={<div className="p-4 text-xl">Welcome, Admin!</div>} />
           <Route path="add-project" element={<AddProject />} />
         </Route>
