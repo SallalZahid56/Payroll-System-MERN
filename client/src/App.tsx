@@ -4,12 +4,16 @@ import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
 import PrivateRoute from "./components/PrivateRoute";
 import ProfileDashboard from "./pages/ProfileDashboard";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route
           path="/admin-dashboard"
