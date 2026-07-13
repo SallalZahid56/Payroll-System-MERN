@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaCheck, FaTimes } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
 import loginSignupImg from "../assets/login-signup.jpg";
 
@@ -19,6 +19,19 @@ declare global {
     }
 }
 
+interface PasswordRequirement {
+    label: string;
+    test: (password: string) => boolean;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+    { label: "At least 8 characters", test: (pw) => pw.length >= 8 },
+    { label: "One uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
+    { label: "One lowercase letter", test: (pw) => /[a-z]/.test(pw) },
+    { label: "One number", test: (pw) => /[0-9]/.test(pw) },
+    { label: "One special character", test: (pw) => /[!@#$%^&*(),.?":{}|<>]/.test(pw) },
+];
+
 export default function Signup() {
     const [showPassword, setShowPassword] = useState(false);
     const [name, setName] = useState("");
@@ -32,7 +45,9 @@ export default function Signup() {
 
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    // ✅ Google signup
+    const isPasswordValid = passwordRequirements.every((req) => req.test(password));
+
+    // Google signup
     useEffect(() => {
         interface GoogleResponse {
             credential: string;
@@ -53,7 +68,6 @@ export default function Signup() {
                     return;
                 }
 
-                // ✅ Store token and role
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("role", data.user.role);
 
@@ -87,7 +101,7 @@ export default function Signup() {
         }
     }, [googleClientId, navigate]);
 
-    // ✅ Form submit
+    // Form submit
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -99,7 +113,7 @@ export default function Signup() {
         if (!phone.trim()) return setError("Phone number is required");
         if (!/^\+?\d{10,15}$/.test(phone)) return setError("Invalid phone number");
         if (!password.trim()) return setError("Password is required");
-        if (password.length < 6) return setError("Password must be at least 6 characters long");
+        if (!isPasswordValid) return setError("Password does not meet the requirements");
 
         setBusy(true);
         try {
@@ -206,6 +220,26 @@ export default function Signup() {
                                 {showPassword ? <FaEyeSlash /> : <FaEye />}
                             </button>
                         </div>
+
+                        {/* Live requirements checklist */}
+                        {password.length > 0 && (
+                            <ul className="space-y-1 text-sm bg-gray-50 rounded-lg p-3">
+                                {passwordRequirements.map((req) => {
+                                    const passed = req.test(password);
+                                    return (
+                                        <li
+                                            key={req.label}
+                                            className={`flex items-center gap-2 ${
+                                                passed ? "text-green-600" : "text-gray-400"
+                                            }`}
+                                        >
+                                            {passed ? <FaCheck size={12} /> : <FaTimes size={12} />}
+                                            {req.label}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
 
                         <button
                             disabled={busy}
