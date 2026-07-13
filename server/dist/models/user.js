@@ -38,7 +38,7 @@ const UserSchema = new mongoose_1.Schema({
     name: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String },
-    // ✅ Added return type boolean and used function keyword to access `this`
+    // Added return type boolean and used function keyword to access `this`
     password: {
         type: String,
         required: function () {
@@ -52,5 +52,7 @@ const UserSchema = new mongoose_1.Schema({
         default: "user",
     },
     created_at: { type: Date, default: Date.now },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
 }, { timestamps: false });
 exports.default = mongoose_1.default.model("User", UserSchema);

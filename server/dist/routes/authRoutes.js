@@ -9,4 +9,6 @@ const router = express_1.default.Router();
 router.post("/signup", authController_1.signup);
 router.post("/login", authController_1.login);
 router.post("/google-signup", authController_1.googleSignup);
+router.post("/forgot-password", authController_1.requestPasswordReset);
+router.post("/reset-password", authController_1.resetPassword);
 exports.default = router;
