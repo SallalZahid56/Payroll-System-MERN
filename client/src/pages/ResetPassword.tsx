@@ -2,7 +2,20 @@ import { useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import api from "../utils/axios";
 import { AxiosError } from "axios";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaCheck, FaTimes } from "react-icons/fa";
+
+interface PasswordRequirement {
+    label: string;
+    test: (password: string) => boolean;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+    { label: "At least 8 characters", test: (pw) => pw.length >= 8 },
+    { label: "One uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
+    { label: "One lowercase letter", test: (pw) => /[a-z]/.test(pw) },
+    { label: "One number", test: (pw) => /[0-9]/.test(pw) },
+    { label: "One special character", test: (pw) => /[!@#$%^&*(),.?":{}|<>]/.test(pw) },
+];
 
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -17,6 +30,10 @@ export default function ResetPassword() {
 
     const navigate = useNavigate();
 
+    // Derived state — recalculated on every render, no extra useEffect needed
+    const isPasswordValid = passwordRequirements.every((req) => req.test(newPassword));
+    const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -27,7 +44,12 @@ export default function ResetPassword() {
             return;
         }
 
-        if (newPassword !== confirmPassword) {
+        if (!isPasswordValid) {
+            setError("Password does not meet the requirements.");
+            return;
+        }
+
+        if (!passwordsMatch) {
             setError("Passwords do not match.");
             return;
         }
@@ -80,6 +102,26 @@ export default function ResetPassword() {
                         </button>
                     </div>
 
+                    {/* Live requirements checklist — only shows once user starts typing */}
+                    {newPassword.length > 0 && (
+                        <ul className="space-y-1 text-sm bg-gray-50 rounded-lg p-3">
+                            {passwordRequirements.map((req) => {
+                                const passed = req.test(newPassword);
+                                return (
+                                    <li
+                                        key={req.label}
+                                        className={`flex items-center gap-2 ${
+                                            passed ? "text-green-600" : "text-gray-400"
+                                        }`}
+                                    >
+                                        {passed ? <FaCheck size={12} /> : <FaTimes size={12} />}
+                                        {req.label}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+
                     <input
                         type={showPassword ? "text" : "password"}
                         value={confirmPassword}
@@ -88,14 +130,18 @@ export default function ResetPassword() {
                         placeholder="Confirm new password"
                         required
                     />
+                    {confirmPassword.length > 0 && !passwordsMatch && (
+                        <p className="text-red-500 text-xs">Passwords do not match</p>
+                    )}
 
                     <button
                         type="submit"
-                        disabled={busy || !token}
-                        className={`w-full py-2 rounded-lg font-semibold transition ${busy || !token
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:opacity-90"
-                            }`}
+                        disabled={busy || !token || !isPasswordValid || !passwordsMatch}
+                        className={`w-full py-2 rounded-lg font-semibold transition ${
+                            busy || !token || !isPasswordValid || !passwordsMatch
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : "bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:opacity-90"
+                        }`}
                     >
                         {busy ? "Resetting..." : "Reset Password"}
                     </button>
