@@ -8,7 +8,7 @@ export const sendResetEmail = async (
 ): Promise<void> => {
   try {
     await resend.emails.send({
-      from: "onboarding@resend.dev",
+      from: "noreply@infonavigators.com",
       to: toEmail,
       subject: "Reset your INFONAV password",
       html: `
