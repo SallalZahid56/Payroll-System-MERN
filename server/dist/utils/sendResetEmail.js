@@ -6,7 +6,7 @@ const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
 const sendResetEmail = async (toEmail, resetLink) => {
     try {
         await resend.emails.send({
-            from: "onboarding@resend.dev",
+            from: "noreply@infonavigators.com",
             to: toEmail,
             subject: "Reset your INFONAV password",
             html: `
